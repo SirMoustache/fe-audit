@@ -34,15 +34,40 @@ npx fe-audit analyze ./app --write    # apply the safe ones
 npx fe-audit verify ./app             # confirm they took effect
 ```
 
-| Option            | Meaning                                          |
-| ----------------- | ------------------------------------------------ |
-| `--write`         | Merge the proposed overrides into `package.json` |
-| `--include-tight` | Also write overrides that cross an exact pin     |
-| `--omit-dev`      | Only consider production dependencies            |
-| `--json`          | Emit raw JSON instead of a report                |
+| Option                | Meaning                                                    |
+| --------------------- | ---------------------------------------------------------- |
+| `--write`             | Merge the proposed overrides into `package.json`           |
+| `--include-tight`     | Also write overrides that cross an exact pin               |
+| `--omit-dev`          | Only consider production dependencies                      |
+| `--json`              | Emit raw JSON instead of a report                          |
+| `--concurrency <n>`   | Parallel registry lookups (default 12)                     |
+| `--no-cache`          | Ignore the on-disk version cache                           |
+| `--cache-ttl <mins>`  | How long cached versions stay fresh (default 60)           |
 
 `verify` exits `1` when an override failed to remove a vulnerability, so it is
 safe to gate CI on.
+
+## Speed
+
+Resolving published versions is the only slow part of a run, so it is done
+concurrently, over HTTP rather than by spawning `npm view`, with gzip and an
+on-disk cache. Measured on a project with 127 findings across 61 packages:
+
+| | Wall clock |
+| --- | --- |
+| Serial `npm view` per package | 96.0s |
+| Concurrent + cached + HTTP | 27.7s |
+| ...with gzip | **10.6s** |
+| ...warm cache | **9.6s** |
+
+`npm audit` itself accounts for 8.3s of that, so resolution now costs a little
+over a second. Results are byte-identical across all four.
+
+The HTTP fast path is only used where the answer is unambiguous — an unscoped
+package on the public registry. A scope may be mapped to a private registry this
+process cannot see, and answering from npmjs could return a different package's
+versions entirely. Scoped packages go through `npm view`, which already knows the
+project's registry and credentials. No auth token is ever read.
 
 ## How findings are classified
 
@@ -140,14 +165,16 @@ const { overrides, conflicts } = planOverrides(remediations);
 ```
 
 `classifyAll` takes a `versionsFor` lookup rather than calling the registry, so
-it can be driven from cached or synthetic data.
+it can be driven from cached or synthetic data. `remediateProject` is async
+because it resolves versions concurrently first; everything under `domain/`
+stays synchronous and pure.
 
 ## Architecture
 
 ```
 src/
   domain/         pure decisions - no fs, no network, no console
-  io/             the only code that touches a process or a disk
+  io/             the only code that touches a process, a socket or a disk
   features/       one slice per capability: survey, remediate, verify
   presentation/   shared text layout
 ```
@@ -162,9 +189,12 @@ originally, the two copies disagreed, and the resulting bug survived until
 
 ```bash
 npm install
-npm test        # 58 assertions, no network required
+npm test        # 62 assertions, no network required
 npm run build
 ```
+
+The cache lives in `os.tmpdir()/fe-audit-cache` unless `FE_AUDIT_CACHE_DIR` says
+otherwise. Deleting it is always safe.
 
 ## Limitations
 

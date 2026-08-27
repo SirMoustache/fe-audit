@@ -17,6 +17,7 @@ import {
 import { assessOverrides, readDeclarations } from '../src/domain/verification';
 import { groupRemediations } from '../src/features/remediate';
 import { assertUsableReport } from '../src/io/npm-client';
+import { mapWithConcurrency } from '../src/io/pool';
 
 let passed = 0;
 
@@ -597,4 +598,51 @@ describe('npm report guard', () => {
   });
 });
 
-console.log(`\n${passed} assertions passed\n`);
+/** Async assertions run after the synchronous suites above. */
+const asyncChecks = async (): Promise<void> => {
+  console.log('\nconcurrency pool');
+
+  const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  await it_('preserves input order regardless of completion order', async () => {
+    const result = await mapWithConcurrency([30, 10, 20, 0], 4, async (ms, index) => {
+      await delay(ms);
+      return index;
+    });
+    assert.deepStrictEqual(result, [0, 1, 2, 3]);
+  });
+
+  await it_('never exceeds the concurrency limit', async () => {
+    let active = 0;
+    let peak = 0;
+    await mapWithConcurrency(Array.from({ length: 20 }, (_, i) => i), 3, async () => {
+      active += 1;
+      peak = Math.max(peak, active);
+      await delay(5);
+      active -= 1;
+      return null;
+    });
+    assert.strictEqual(peak <= 3, true, `peak concurrency was ${peak}`);
+  });
+
+  await it_('handles an empty list without hanging', async () => {
+    assert.deepStrictEqual(await mapWithConcurrency([], 8, async () => null), []);
+  });
+
+  await it_('tolerates a limit larger than the input', async () => {
+    assert.deepStrictEqual(
+      await mapWithConcurrency([1, 2], 99, async (n) => n * 2),
+      [2, 4]
+    );
+  });
+
+  console.log(`\n${passed} assertions passed\n`);
+};
+
+async function it_(label: string, fn: () => Promise<void>): Promise<void> {
+  await fn();
+  passed += 1;
+  console.log(`  ok  ${label}`);
+}
+
+void asyncChecks();

@@ -22,8 +22,9 @@ import {
   needsReview,
 } from '../../domain/remediation';
 import type { PackageName } from '../../domain/semver-policy';
-import type { Registry } from '../../io/npm-client';
-import { audit, createRegistry } from '../../io/npm-client';
+import { audit } from '../../io/npm-client';
+import type { Registry, RegistryOptions } from '../../io/registry';
+import { createRegistry } from '../../io/registry';
 import { readLockfile, readManifest, saveOverrides } from '../../io/workspace';
 
 export interface RemediationGroups {
@@ -50,22 +51,19 @@ export interface RemediateOptions {
   readonly omitDev?: boolean;
   readonly includeTight?: boolean;
   readonly registry?: Registry;
+  readonly registryOptions?: RegistryOptions;
 }
 
 /**
  * Fetching every candidate's published versions up front keeps the classifier
- * pure: it receives a lookup table, never a network call.
+ * pure: it receives a lookup table, never a network call. It is also the only
+ * slow part of a run, so it is the part worth doing concurrently.
  */
-export const collectVersions = (
+export const collectVersions = async (
   findings: readonly Finding[],
   registry: Registry
-): ReadonlyMap<PackageName, VersionLookup> =>
-  new Map(
-    [...new Set(findings.filter(hasOwnAdvisory).map((finding) => finding.name))].map((name) => [
-      name,
-      registry.versionsFor(name),
-    ])
-  );
+): Promise<ReadonlyMap<PackageName, VersionLookup>> =>
+  registry.fetchAll([...new Set(findings.filter(hasOwnAdvisory).map((finding) => finding.name))]);
 
 export const groupRemediations = (
   remediations: readonly Remediation[]
@@ -82,16 +80,19 @@ export const groupRemediations = (
   };
 };
 
-export const remediateProject = (
+export const remediateProject = async (
   projectDir: string,
-  { omitDev = false, includeTight = false, registry }: RemediateOptions = {}
-): RemediationResult => {
+  { omitDev = false, includeTight = false, registry, registryOptions }: RemediateOptions = {}
+): Promise<RemediationResult> => {
   const report = audit(projectDir, { omitDev });
   const manifest = readManifest(projectDir);
   const graph = buildDependencyGraph(readLockfile(projectDir), { manifest });
   const findings = readFindings(report);
 
-  const versions = collectVersions(findings, registry ?? createRegistry(projectDir));
+  const versions = await collectVersions(
+    findings,
+    registry ?? createRegistry(projectDir, registryOptions)
+  );
   const remediations = classifyAll(
     findings,
     graph,

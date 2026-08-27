@@ -1,10 +1,12 @@
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import type { ExecFileSyncOptionsWithStringEncoding } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { promisify } from 'node:util';
 import type { AuditReport } from '../domain/finding';
 import type { PackageName, Version } from '../domain/semver-policy';
-import type { VersionLookup } from '../domain/remediation';
+
+const execFileAsync = promisify(execFile);
 
 /**
  * The only place that shells out. Spawning `npm.cmd` needs `shell: true` on
@@ -73,40 +75,40 @@ export const audit = (cwd: string, { omitDev = false }: AuditOptions = {}): Audi
   return assertUsableReport(parse<AuditReport>(output), cwd);
 };
 
-export interface Registry {
-  versionsFor(name: PackageName): VersionLookup;
-}
+const runAsync = async (args: readonly string[], cwd: string): Promise<string> => {
+  const options = { cwd, encoding: 'utf8' as const, maxBuffer: 64 * 1024 * 1024 };
+  const { stdout } = NPM_CLI
+    ? await execFileAsync(process.execPath, [NPM_CLI, ...args], options)
+    : await execFileAsync(NPM_FALLBACK, [...args], { ...options, shell: true });
+  return stdout;
+};
 
-const lookup = (name: PackageName, cwd: string): VersionLookup => {
-  let raw: string;
-  try {
-    raw = run(['view', name, 'versions', '--json'], cwd).trim();
-  } catch {
-    return { ok: false, reason: `registry lookup failed for ${name}` };
-  }
-  if (!raw) return { ok: false, reason: `registry returned no versions for ${name}` };
-  try {
-    const parsed = parse<Version | Version[]>(raw);
-    return { ok: true, versions: Array.isArray(parsed) ? parsed : [parsed] };
-  } catch {
-    return { ok: false, reason: `registry returned unparseable versions for ${name}` };
-  }
+/** A single npm config value, resolved through npm's own precedence rules. */
+export const npmConfigGet = async (key: string, cwd: string): Promise<string> => {
+  const value = (await runAsync(['config', 'get', key], cwd)).trim();
+  return value === 'undefined' || value.startsWith(';') ? '' : value;
 };
 
 /**
- * Published versions for a package. A registry failure is reported rather than
- * swallowed: silently returning an empty list reads downstream as "no safe
- * version exists", which is a different and much more alarming claim.
+ * Published versions via npm itself. Slower than a direct request, but it knows
+ * the project's registry mapping and credentials, so it is the correct fallback
+ * for anything the fast path cannot answer unambiguously.
  */
-export const createRegistry = (cwd: string): Registry => {
-  const cache = new Map<PackageName, VersionLookup>();
-  return {
-    versionsFor(name) {
-      const cached = cache.get(name);
-      if (cached) return cached;
-      const result = lookup(name, cwd);
-      cache.set(name, result);
-      return result;
-    },
-  };
+export const viewVersions = async (
+  name: PackageName,
+  cwd: string
+): Promise<readonly Version[] | null> => {
+  let raw: string;
+  try {
+    raw = (await runAsync(['view', name, 'versions', '--json'], cwd)).trim();
+  } catch {
+    return null;
+  }
+  if (!raw) return null;
+  try {
+    const parsed = parse<Version | Version[]>(raw);
+    return Array.isArray(parsed) ? parsed : [parsed];
+  } catch {
+    return null;
+  }
 };
