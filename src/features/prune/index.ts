@@ -3,10 +3,10 @@ import { readDeclarations } from '../../domain/override-set';
 import type { OverrideAssessment } from '../../domain/pruning';
 import { assessOverridesForPruning, isRemovable, pruneOverrides } from '../../domain/pruning';
 import type { PackageName, Version } from '../../domain/semver-policy';
-import { fetchAdvisories } from '../../io/advisories';
-import type { RegistryOptions } from '../../io/registry';
-import { createRegistry } from '../../io/registry';
-import { saveOverrides } from '../../io/workspace';
+import { fetchAdvisories } from '../../infrastructure/advisories';
+import type { RegistryOptions } from '../../infrastructure/registry';
+import { createRegistry } from '../../infrastructure/registry';
+import { saveOverrides } from '../../infrastructure/workspace';
 import { loadProject } from '../project-context';
 
 export interface PruneResult {

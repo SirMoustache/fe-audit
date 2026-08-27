@@ -20,10 +20,10 @@ import { explainPackage, hasForcedBreaking } from '../src/domain/explanation';
 import { analyseUsage } from '../src/domain/usage';
 import { assessOverridesForPruning, pruneOverrides } from '../src/domain/pruning';
 import { emptyKnowledge } from '../src/domain/advisory';
-import { parseJsonc, specifierToPackage } from '../src/io/source-scanner';
+import { parseJsonc, specifierToPackage } from '../src/infrastructure/source-scanner';
 import { groupRemediations } from '../src/features/remediate';
-import { assertUsableReport } from '../src/io/npm-client';
-import { mapWithConcurrency } from '../src/io/pool';
+import { assertUsableReport } from '../src/infrastructure/npm-client';
+import { mapWithConcurrency } from '../src/infrastructure/pool';
 
 let passed = 0;
 

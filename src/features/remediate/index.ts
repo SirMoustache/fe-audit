@@ -21,10 +21,10 @@ import {
   needsReview,
 } from '../../domain/remediation';
 import type { PackageName } from '../../domain/semver-policy';
-import { audit } from '../../io/npm-client';
-import type { Registry, RegistryOptions } from '../../io/registry';
-import { createRegistry } from '../../io/registry';
-import { saveOverrides } from '../../io/workspace';
+import { audit } from '../../infrastructure/npm-client';
+import type { Registry, RegistryOptions } from '../../infrastructure/registry';
+import { createRegistry } from '../../infrastructure/registry';
+import { saveOverrides } from '../../infrastructure/workspace';
 import { loadProject } from '../project-context';
 
 export interface RemediationGroups {

@@ -9,6 +9,14 @@ npm run changeset
 
 That writes a randomly-named markdown file here. Commit it with your change.
 
+## Before the first release
+
+Until `1.0.0` ships there is nothing to describe a change *against*. A note
+saying an internal seam was tidied would land in the `1.0.0` changelog and tell
+first-time readers about a state they never had. Until then, fold anything
+user-visible into `initial-release.md` and skip the changeset entirely for
+refactors.
+
 The full walkthrough, including what the release pull request looks like, is in
 [the README](../README.md#contributing-a-change).
 

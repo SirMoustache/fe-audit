@@ -36,17 +36,22 @@ Two TypeScript configs, deliberately:
 
 ```
 src/
-  domain/         pure decisions - no fs, no network, no console
-  io/             the only code that touches a process, a socket or a disk
-  features/       one slice per capability: survey, remediate, verify
-  presentation/   shared text layout
+  domain/           pure decisions - no fs, no network, no console
+  infrastructure/   technical capability: npm, the registry, the filesystem
+  features/         one slice per capability: survey, remediate, verify, ...
+  presentation/     shared text layout
 ```
+
+The names follow Evans' layering rather than hexagonal ports and adapters —
+`infrastructure` here means "technical capability supporting the layers above",
+which is why a concurrency pool belongs in it even though it performs no I/O of
+its own. There are no ports: features wire the domain to infrastructure directly.
 
 Three rules keep this honest:
 
-**`domain/` may not import from `io/`.** It receives data, returns decisions.
-That is what makes the classifier testable without a network, and why the suite
-runs offline in a second.
+**`domain/` may not import from `infrastructure/`.** It receives data, returns
+decisions. That is what makes the classifier testable without a network, and why
+the suite runs offline in a second.
 
 **Version lookups are a table, not a call.** `classifyAll` takes a `versionsFor`
 function that reads from a pre-fetched `Map`. The feature layer does the
@@ -60,8 +65,8 @@ as `still-listed`; `features/*/render.ts` decides what English that becomes.
 
 Each slice under `features/` is two files:
 
-- **`index.ts`** — the use case. Talks to `io/` and `domain/`, returns a plain
-  result object. It has no idea a terminal exists.
+- **`index.ts`** — the use case. Talks to `infrastructure/` and `domain/`, and
+  returns a plain result object. It has no idea a terminal exists.
 - **`render.ts`** — turns that result into lines of text. Pure
   `Result → readonly string[]`, so it is testable without capturing stdout.
 
@@ -79,7 +84,7 @@ MVC that is not here. The filename also matches its single export, `renderX`.
 | A new classification rule          | `domain/remediation.ts`                       |
 | Version or range arithmetic        | `domain/semver-policy.ts`                     |
 | Anything about the installed tree  | `domain/dependency-graph.ts`                  |
-| Reading npm, the registry, or disk | `io/`                                         |
+| Reading npm, the registry, or disk | `infrastructure/`                             |
 | A new command                      | a new folder under `features/`, plus `cli.ts` |
 | Changing report wording            | the relevant `features/*/render.ts`           |
 

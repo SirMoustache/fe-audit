@@ -12,8 +12,8 @@ import { analyseProjectUsage } from './features/usage';
 import { renderUsage } from './features/usage/render';
 import { prunableOverrides, applyPruning } from './features/prune';
 import { renderPruning } from './features/prune/render';
-import type { RegistryOptions } from './io/registry';
-import { isProject } from './io/workspace';
+import type { RegistryOptions } from './infrastructure/registry';
+import { isProject } from './infrastructure/workspace';
 
 const USAGE = `
 fe-audit - classify npm audit findings and generate safe overrides

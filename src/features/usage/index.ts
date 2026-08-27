@@ -2,7 +2,7 @@ import type { Lockfile, Manifest } from '../../domain/dependency-graph';
 import type { PackageName } from '../../domain/semver-policy';
 import type { DeclaredDependency, UsageReport } from '../../domain/usage';
 import { analyseUsage } from '../../domain/usage';
-import { scanProject } from '../../io/source-scanner';
+import { scanProject } from '../../infrastructure/source-scanner';
 import type { AuditStatus } from '../project-context';
 import { loadAudit, loadProject } from '../project-context';
 

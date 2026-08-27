@@ -1,6 +1,6 @@
 import type { AssessedProject } from '../../domain/project-health';
 import { assessProject, isBlocked } from '../../domain/project-health';
-import { describeProject, findProjects } from '../../io/workspace';
+import { describeProject, findProjects } from '../../infrastructure/workspace';
 
 export interface SurveyResult {
   readonly rootDir: string;

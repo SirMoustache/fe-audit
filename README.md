@@ -298,10 +298,10 @@ stays synchronous and pure.
 
 ```
 src/
-  domain/         pure decisions - no fs, no network, no console
-  io/             the only code that touches a process, a socket or a disk
-  features/       one slice per capability: survey, remediate, verify
-  presentation/   shared text layout
+  domain/           pure decisions - no fs, no network, no console
+  infrastructure/   technical capability: npm, the registry, the filesystem
+  features/         one slice per capability: survey, remediate, verify, ...
+  presentation/     shared text layout
 ```
 
 One rule earns its own home in `domain/dependency-graph.ts`: **npm keys a scoped

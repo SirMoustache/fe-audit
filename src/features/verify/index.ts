@@ -2,7 +2,7 @@ import { vulnerablePackageNames } from '../../domain/finding';
 import type { PackageName } from '../../domain/semver-policy';
 import type { Assessment } from '../../domain/verification';
 import { assessOverrides, isFailure } from '../../domain/verification';
-import { audit } from '../../io/npm-client';
+import { audit } from '../../infrastructure/npm-client';
 import { loadProject } from '../project-context';
 
 export interface VerificationResult {

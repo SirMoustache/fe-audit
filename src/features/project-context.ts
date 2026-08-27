@@ -2,8 +2,8 @@ import { buildDependencyGraph } from '../domain/dependency-graph';
 import type { DependencyGraph, Lockfile, Manifest, OverrideTree } from '../domain/dependency-graph';
 import type { Finding } from '../domain/finding';
 import { readFindings } from '../domain/finding';
-import { audit } from '../io/npm-client';
-import { readLockfile, readManifest } from '../io/workspace';
+import { audit } from '../infrastructure/npm-client';
+import { readLockfile, readManifest } from '../infrastructure/workspace';
 
 /**
  * How advisory context was obtained. Named as three states rather than a
