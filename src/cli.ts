@@ -1,17 +1,17 @@
 #!/usr/bin/env node
 import path from 'node:path';
 import { remediateProject, applyOverrides } from './features/remediate';
-import { renderRemediation } from './features/remediate/view';
+import { renderRemediation } from './features/remediate/render';
 import { surveyWorkspace } from './features/survey';
-import { renderSurvey } from './features/survey/view';
+import { renderSurvey } from './features/survey/render';
 import { verifyProject } from './features/verify';
-import { renderVerification } from './features/verify/view';
+import { renderVerification } from './features/verify/render';
 import { explainInProject } from './features/explain';
-import { renderExplanation } from './features/explain/view';
+import { renderExplanation } from './features/explain/render';
 import { analyseProjectUsage } from './features/usage';
-import { renderUsage } from './features/usage/view';
+import { renderUsage } from './features/usage/render';
 import { prunableOverrides, applyPruning } from './features/prune';
-import { renderPruning } from './features/prune/view';
+import { renderPruning } from './features/prune/render';
 import type { RegistryOptions } from './io/registry';
 import { isProject } from './io/workspace';
 

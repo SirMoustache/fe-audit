@@ -54,18 +54,34 @@ fetching. Do not be tempted to make the domain async to "simplify" this — the
 purity is the point.
 
 **Wording lives in views, not in the domain.** The domain returns a verdict such
-as `still-listed`; `features/*/view.ts` decides what English that becomes.
+as `still-listed`; `features/*/render.ts` decides what English that becomes.
 
 ### Where to put a change
 
-| Change                             | Goes in                                       |
+Each slice under `features/` is two files:
+
+- **`index.ts`** — the use case. Talks to `io/` and `domain/`, returns a plain
+  result object. It has no idea a terminal exists.
+- **`render.ts`** — turns that result into lines of text. Pure
+  `Result → readonly string[]`, so it is testable without capturing stdout.
+
+The split is what lets `--json` bypass presentation entirely, and what keeps
+wording out of the domain: `verification.ts` returns the verdict `still-listed`,
+and `render.ts` decides that reads as `STILL LISTED — audit still lists X, but
+several copies exist`.
+
+It is `render.ts` rather than `view.ts` deliberately. These are one-shot pure
+functions, not components bound to a model, and "view" invites the rest of an
+MVC that is not here. The filename also matches its single export, `renderX`.
+
+| Change | Goes in |
 | ---------------------------------- | --------------------------------------------- |
 | A new classification rule          | `domain/remediation.ts`                       |
 | Version or range arithmetic        | `domain/semver-policy.ts`                     |
 | Anything about the installed tree  | `domain/dependency-graph.ts`                  |
 | Reading npm, the registry, or disk | `io/`                                         |
 | A new command                      | a new folder under `features/`, plus `cli.ts` |
-| Changing report wording            | the relevant `features/*/view.ts`             |
+| Changing report wording            | the relevant `features/*/render.ts`           |
 
 One rule earns its own home in `domain/dependency-graph.ts`: **npm keys a scoped
 override by the package that declares the dependency, not by the directory the
