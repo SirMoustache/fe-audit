@@ -1,12 +1,10 @@
-import { buildDependencyGraph } from '../../domain/dependency-graph';
 import type { Lockfile, Manifest } from '../../domain/dependency-graph';
-import { readFindings } from '../../domain/finding';
 import type { PackageName } from '../../domain/semver-policy';
 import type { DeclaredDependency, UsageReport } from '../../domain/usage';
 import { analyseUsage } from '../../domain/usage';
-import { audit } from '../../io/npm-client';
 import { scanProject } from '../../io/source-scanner';
-import { readLockfile, readManifest } from '../../io/workspace';
+import type { AuditStatus } from '../project-context';
+import { loadAudit, loadProject } from '../project-context';
 
 const DECLARATION_FIELDS = ['dependencies', 'devDependencies', 'optionalDependencies'] as const;
 
@@ -24,8 +22,7 @@ const binNamesFrom = (lockfile: Lockfile): ReadonlyMap<PackageName, readonly str
   for (const [installPath, entry] of Object.entries(lockfile.packages ?? {})) {
     const match = /^node_modules\/((?:@[^/]+\/)?[^/]+)$/.exec(installPath);
     if (!match || !entry.bin) continue;
-    const names =
-      typeof entry.bin === 'string' ? [match[1] as string] : Object.keys(entry.bin);
+    const names = typeof entry.bin === 'string' ? [match[1] as string] : Object.keys(entry.bin);
     bins.set(match[1] as PackageName, names);
   }
   return bins;
@@ -33,7 +30,8 @@ const binNamesFrom = (lockfile: Lockfile): ReadonlyMap<PackageName, readonly str
 
 export interface UsageResult extends UsageReport {
   readonly projectDir: string;
-  readonly auditStatus: 'ok' | 'skipped' | 'unavailable';
+  readonly sourceFileCount: number;
+  readonly auditStatus: AuditStatus;
 }
 
 export interface UsageOptions {
@@ -44,36 +42,25 @@ export const analyseProjectUsage = (
   projectDir: string,
   { skipAudit = false }: UsageOptions = {}
 ): UsageResult => {
-  const manifest = readManifest(projectDir);
-  const lockfile = readLockfile(projectDir);
-  const graph = buildDependencyGraph(lockfile, { manifest });
+  const project = loadProject(projectDir);
   const scanned = scanProject(projectDir);
-
-  const findings = skipAudit
-    ? null
-    : (() => {
-        try {
-          return readFindings(audit(projectDir));
-        } catch {
-          return null;
-        }
-      })();
+  const { findings, status } = loadAudit(projectDir, { skip: skipAudit });
 
   const report = analyseUsage({
-    graph,
-    declared: declaredIn(manifest),
+    graph: project.graph,
+    declared: declaredIn(project.manifest),
     imports: scanned.imports,
     configText: scanned.configText,
-    scripts: manifest.scripts ?? {},
-    overrides: manifest.overrides ?? {},
-    findings: findings ?? [],
-    binNames: binNamesFrom(lockfile),
+    scripts: project.manifest.scripts ?? {},
+    overrides: project.overrides,
+    findings,
+    binNames: binNamesFrom(project.lockfile),
   });
 
   return {
     ...report,
-    sourceFileCount: scanned.sourceFileCount,
     projectDir,
-    auditStatus: skipAudit ? 'skipped' : findings === null ? 'unavailable' : 'ok',
+    sourceFileCount: scanned.sourceFileCount,
+    auditStatus: status,
   };
 };

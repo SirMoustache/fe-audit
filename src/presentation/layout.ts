@@ -24,3 +24,18 @@ export const indent = (text: string, depth = 1): string => '  '.repeat(depth) + 
 export const section = (title: string, count: number): string => `${title} (${count})`;
 
 export const emptyNotice = (message = 'none'): string => indent(message);
+
+/**
+ * A titled block with its count, falling back to a placeholder when empty.
+ * Every report is built from these, so the shape stays consistent across
+ * commands without each view re-deriving it.
+ */
+export const listing = <T>(
+  title: string,
+  items: readonly T[],
+  toLines: (item: T) => readonly string[]
+): readonly string[] => [
+  blank(),
+  section(title, items.length),
+  ...(items.length === 0 ? [emptyNotice()] : items.flatMap(toLines)),
+];

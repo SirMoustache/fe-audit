@@ -1,4 +1,3 @@
-import { buildDependencyGraph } from '../../domain/dependency-graph';
 import type { OverrideTree } from '../../domain/dependency-graph';
 import type { AuditTotals, Finding } from '../../domain/finding';
 import { hasOwnAdvisory, readFindings, readTotals } from '../../domain/finding';
@@ -25,7 +24,8 @@ import type { PackageName } from '../../domain/semver-policy';
 import { audit } from '../../io/npm-client';
 import type { Registry, RegistryOptions } from '../../io/registry';
 import { createRegistry } from '../../io/registry';
-import { readLockfile, readManifest, saveOverrides } from '../../io/workspace';
+import { saveOverrides } from '../../io/workspace';
+import { loadProject } from '../project-context';
 
 export interface RemediationGroups {
   readonly safe: readonly OverrideRemedy[];
@@ -85,23 +85,23 @@ export const remediateProject = async (
   { omitDev = false, includeTight = false, registry, registryOptions }: RemediateOptions = {}
 ): Promise<RemediationResult> => {
   const report = audit(projectDir, { omitDev });
-  const manifest = readManifest(projectDir);
-  const graph = buildDependencyGraph(readLockfile(projectDir), { manifest });
+  const project = loadProject(projectDir);
   const findings = readFindings(report);
 
   const versions = await collectVersions(
     findings,
     registry ?? createRegistry(projectDir, registryOptions)
   );
+
   const remediations = classifyAll(
     findings,
-    graph,
+    project.graph,
     (name) => versions.get(name) ?? { ok: false, reason: `no registry data for ${name}` }
   );
 
   const plan = planOverrides(remediations, {
     includeTight,
-    isDirectDependency: (name) => graph.directDependency(name) !== null,
+    isDirectDependency: (name) => project.graph.directDependency(name) !== null,
   });
 
   return {
@@ -116,4 +116,4 @@ export const remediateProject = async (
 };
 
 export const applyOverrides = (projectDir: string, overrides: OverrideTree): string =>
-  saveOverrides(projectDir, mergeOverrides(readManifest(projectDir).overrides, overrides));
+  saveOverrides(projectDir, mergeOverrides(loadProject(projectDir).overrides, overrides));

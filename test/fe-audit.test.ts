@@ -14,10 +14,12 @@ import {
   isBreakingUpgrade,
   isExpressible,
 } from '../src/domain/semver-policy';
-import { assessOverrides, readDeclarations } from '../src/domain/verification';
+import { assessOverrides } from '../src/domain/verification';
+import { readDeclarations } from '../src/domain/override-set';
 import { explainPackage, hasForcedBreaking } from '../src/domain/explanation';
 import { analyseUsage } from '../src/domain/usage';
 import { assessOverridesForPruning, pruneOverrides } from '../src/domain/pruning';
+import { emptyKnowledge } from '../src/domain/advisory';
 import { parseJsonc, specifierToPackage } from '../src/io/source-scanner';
 import { groupRemediations } from '../src/features/remediate';
 import { assertUsableReport } from '../src/io/npm-client';
@@ -747,21 +749,18 @@ describe('pruning', () => {
     ['tmp', ['0.0.33', '0.1.0', '0.2.7']],
   ]);
 
-  const advisories = new Map([
-    ['flatted', [{ title: 'a', severity: 'high', vulnerableRange: '<=3.4.1' }]],
-    ['jws', [{ title: 'b', severity: 'high', vulnerableRange: '<3.2.3' }]],
-    ['lodash', [{ title: 'c', severity: 'high', vulnerableRange: '<=4.17.23' }]],
-    ['tmp', [{ title: 'd', severity: 'high', vulnerableRange: '<0.2.6' }]],
-  ]);
+  const knowledge = {
+    advisories: new Map([
+      ['flatted', [{ title: 'a', severity: 'high', vulnerableRange: '<=3.4.1' }]],
+      ['jws', [{ title: 'b', severity: 'high', vulnerableRange: '<3.2.3' }]],
+      ['lodash', [{ title: 'c', severity: 'high', vulnerableRange: '<=4.17.23' }]],
+      ['tmp', [{ title: 'd', severity: 'high', vulnerableRange: '<0.2.6' }]],
+    ]),
+    queried: new Set(['flatted', 'jws', 'lodash', 'tmp']),
+  };
 
   const assess = (overrides: Parameters<typeof assessOverridesForPruning>[0]['overrides']) =>
-    assessOverridesForPruning({
-      graph: pruneGraph,
-      overrides,
-      versions,
-      advisories,
-      queried: new Set(['flatted', 'jws', 'lodash', 'tmp']),
-    });
+    assessOverridesForPruning({ graph: pruneGraph, overrides, versions, knowledge });
 
   const verdictOf = (name: string, overrides: Record<string, string>) =>
     assess(overrides).find((entry) => entry.name === name)?.verdict;
@@ -792,8 +791,7 @@ describe('pruning', () => {
       graph: pruneGraph,
       overrides: { flatted: '^3.4.2' },
       versions,
-      advisories: new Map(),
-      queried: new Set(),
+      knowledge: emptyKnowledge(),
     });
     assert.strictEqual(withoutData[0]!.verdict, 'unknown');
   });

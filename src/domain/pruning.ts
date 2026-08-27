@@ -1,14 +1,11 @@
 import semver from 'semver';
+import type { AdvisoryKnowledge } from './advisory';
+import { advisoriesFor, isVulnerable, wasQueried } from './advisory';
 import type { DependencyGraph, OverrideTree, PackageInstance } from './dependency-graph';
-import { readDeclarations } from './verification';
+import type { OverrideDeclaration } from './override-set';
+import { readDeclarations } from './override-set';
 import type { PackageName, RangeSpec, Version } from './semver-policy';
-import { accepts, isBreakingUpgrade, isExpressible, isStable } from './semver-policy';
-
-export interface AdvisoryRange {
-  readonly title: string;
-  readonly severity: string;
-  readonly vulnerableRange: RangeSpec;
-}
+import { isBreakingUpgrade, isExpressible, isStable, accepts } from './semver-policy';
 
 /** Whether an override is still earning its place. */
 export type PruneVerdict =
@@ -41,17 +38,8 @@ export interface PruneInput {
   readonly graph: DependencyGraph;
   readonly overrides: OverrideTree;
   readonly versions: ReadonlyMap<PackageName, readonly Version[]>;
-  readonly advisories: ReadonlyMap<PackageName, readonly AdvisoryRange[]>;
-  /** Packages the advisory service actually answered for. */
-  readonly queried: ReadonlySet<PackageName>;
+  readonly knowledge: AdvisoryKnowledge;
 }
-
-const isVulnerable = (
-  version: Version | null,
-  advisories: readonly AdvisoryRange[]
-): boolean =>
-  version !== null &&
-  advisories.some((advisory) => accepts(advisory.vulnerableRange, version));
 
 /**
  * What npm would settle on without the override, from two angles.
@@ -99,11 +87,11 @@ const naturalVersions = (
 };
 
 const assessInstance = (
-  declaration: { name: PackageName; scopeKey: PackageName | null; range: RangeSpec },
+  declaration: OverrideDeclaration,
   instance: PackageInstance,
   input: PruneInput
 ): OverrideAssessment => {
-  const advisories = input.advisories.get(declaration.name) ?? [];
+  const advisories = advisoriesFor(input.knowledge, declaration.name);
   const published = input.versions.get(declaration.name) ?? [];
   const { optimistic, consensus } = naturalVersions(input.graph, instance, published);
 
@@ -129,7 +117,7 @@ const assessInstance = (
 
   // Missing advisory data must never read as "nothing to worry about" — that
   // would turn a network failure into a recommendation to delete every override.
-  if (!input.queried.has(declaration.name)) {
+  if (!wasQueried(input.knowledge, declaration.name)) {
     return { ...base, verdict: 'unknown', reason: 'advisory data unavailable for this package' };
   }
 

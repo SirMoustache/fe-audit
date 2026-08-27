@@ -1,7 +1,7 @@
 import type { DependencyGraph, OverrideTree, PackageInstance } from './dependency-graph';
 import type { Finding } from './finding';
 import { hasOwnAdvisory } from './finding';
-import { readDeclarations } from './verification';
+import { readDeclarations } from './override-set';
 import type { PackageName, RangeSpec } from './semver-policy';
 
 /** Why a package is considered used, strongest evidence first. */
@@ -57,7 +57,6 @@ export interface UsageReport {
   readonly unreferenced: readonly UnreferencedDependency[];
   readonly phantom: readonly PhantomDependency[];
   readonly deadOverrides: readonly DeadOverride[];
-  readonly sourceFileCount: number;
 }
 
 export interface UsageInput {
@@ -300,6 +299,5 @@ export const analyseUsage = (input: UsageInput): UsageReport => {
     unreferenced,
     phantom,
     deadOverrides,
-    sourceFileCount: 0,
   };
 };

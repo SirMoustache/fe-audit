@@ -6,7 +6,7 @@ import type {
   Remediation,
   RiskyRemedy,
 } from '../../domain/remediation';
-import { blank, column, emptyNotice, indent, section } from '../../presentation/layout';
+import { blank, column, indent, listing } from '../../presentation/layout';
 import type { RemediationResult } from './index';
 
 const NAME_WIDTH = 42;
@@ -21,16 +21,6 @@ const scopeLabel = (remedy: OverrideRemedy): string =>
 
 const row = (label: string, remedy: Upgradeable, note: string): string =>
   indent(column(label, NAME_WIDTH) + column(move(remedy), MOVE_WIDTH) + note);
-
-const listing = <T>(
-  title: string,
-  items: readonly T[],
-  toLines: (item: T) => readonly string[]
-): readonly string[] => [
-  blank(),
-  section(title, items.length),
-  ...(items.length === 0 ? [emptyNotice()] : items.flatMap(toLines)),
-];
 
 const safeLines = (remedy: OverrideRemedy): readonly string[] => [
   row(remedy.name, remedy, `${remedy.consumerCount} consumer(s), all ranges satisfied`),

@@ -1,10 +1,9 @@
-import { buildDependencyGraph } from '../../domain/dependency-graph';
 import { vulnerablePackageNames } from '../../domain/finding';
+import type { PackageName } from '../../domain/semver-policy';
 import type { Assessment } from '../../domain/verification';
 import { assessOverrides, isFailure } from '../../domain/verification';
-import type { PackageName } from '../../domain/semver-policy';
 import { audit } from '../../io/npm-client';
-import { readLockfile, readManifest } from '../../io/workspace';
+import { loadProject } from '../project-context';
 
 export interface VerificationResult {
   readonly projectDir: string;
@@ -31,13 +30,13 @@ export const verifyProject = (
   projectDir: string,
   { vulnerableNames }: VerifyOptions = {}
 ): VerificationResult => {
-  const manifest = readManifest(projectDir);
-  const graph = buildDependencyGraph(readLockfile(projectDir), { manifest });
+  const project = loadProject(projectDir);
 
   const assessments = assessOverrides({
-    graph,
-    overrides: manifest.overrides ?? {},
-    vulnerableNames: vulnerableNames === undefined ? readVulnerableNames(projectDir) : vulnerableNames,
+    graph: project.graph,
+    overrides: project.overrides,
+    vulnerableNames:
+      vulnerableNames === undefined ? readVulnerableNames(projectDir) : vulnerableNames,
   });
 
   return {

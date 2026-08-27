@@ -1,6 +1,6 @@
 import https from 'node:https';
 import { createGunzip } from 'node:zlib';
-import type { Severity } from '../domain/finding';
+import type { Advisory, AdvisoryIndex, AdvisoryKnowledge } from '../domain/advisory';
 import type { PackageName, RangeSpec, Version } from '../domain/semver-policy';
 
 const BULK_PATH = '/-/npm/v1/security/advisories/bulk';
@@ -9,17 +9,9 @@ const REQUEST_TIMEOUT_MS = 15_000;
 /** How many packages to ask about in one request. */
 const BATCH_SIZE = 40;
 
-export interface Advisory {
-  readonly title: string;
-  readonly severity: Severity;
-  readonly vulnerableRange: RangeSpec;
-}
-
-export type AdvisoryIndex = ReadonlyMap<PackageName, readonly Advisory[]>;
-
 interface BulkAdvisory {
   readonly title?: string;
-  readonly severity?: Severity;
+  readonly severity?: string;
   readonly vulnerable_versions?: RangeSpec;
 }
 
@@ -95,7 +87,7 @@ export interface AdvisoryLookup {
 export const fetchAdvisories = async (
   versionsByPackage: ReadonlyMap<PackageName, readonly Version[]>,
   { registry = 'https://registry.npmjs.org/' } = {}
-): Promise<AdvisoryLookup> => {
+): Promise<AdvisoryKnowledge> => {
   const index = new Map<PackageName, Advisory[]>();
   const queried = new Set<PackageName>();
   const entries = [...versionsByPackage.entries()].filter(([, versions]) => versions.length > 0);

@@ -8,6 +8,34 @@ export const SELF = '.';
 
 const TARGET_SEPARATOR = '\u0000';
 
+/** One constraint from an overrides block, with its nesting made explicit. */
+export interface OverrideDeclaration {
+  readonly name: PackageName;
+  /** `null` for a top-level override; otherwise the package it is scoped under. */
+  readonly scopeKey: PackageName | null;
+  readonly range: RangeSpec;
+}
+
+const isTree = (value: RangeSpec | OverrideTree | undefined): value is OverrideTree =>
+  typeof value === 'object' && value !== null;
+
+/**
+ * npm's nested grammar, flattened into one declaration per constraint.
+ *
+ * Lives beside the code that writes that grammar, so reading and writing it
+ * cannot drift apart.
+ */
+export const readDeclarations = (overrides: OverrideTree): readonly OverrideDeclaration[] =>
+  Object.entries(overrides ?? {}).flatMap(([key, value]) =>
+    isTree(value)
+      ? Object.entries(value).map(([child, range]) =>
+          child === SELF
+            ? { name: key, scopeKey: null, range: range as RangeSpec }
+            : { name: child, scopeKey: key, range: range as RangeSpec }
+        )
+      : [{ name: key, scopeKey: null, range: value }]
+  );
+
 type MutableOverrideTree = { [key: string]: RangeSpec | MutableOverrideTree };
 
 interface Placement {
@@ -41,9 +69,6 @@ export interface PlanOptions {
   readonly includeTight?: boolean;
   readonly isDirectDependency?: (name: PackageName) => boolean;
 }
-
-const isTree = (value: RangeSpec | OverrideTree | undefined): value is OverrideTree =>
-  typeof value === 'object' && value !== null;
 
 const applicable =
   (includeTight: boolean) =>

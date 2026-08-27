@@ -1,9 +1,8 @@
 import type { DependencyGraph, OverrideTree, PackageInstance } from './dependency-graph';
 import type { Finding, Severity } from './finding';
-import { SELF } from './override-set';
+import { readDeclarations } from './override-set';
 import type { PackageName, RangeSpec, Version } from './semver-policy';
 import { accepts, isBreakingUpgrade, isExpressible, rangeFloor } from './semver-policy';
-import { readDeclarations } from './verification';
 
 export interface ConsumerVerdict {
   readonly name: PackageName | '<root project>';

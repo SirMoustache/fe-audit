@@ -1,5 +1,5 @@
 import type { OverrideAssessment, PruneVerdict } from '../../domain/pruning';
-import { blank, column, emptyNotice, indent, section } from '../../presentation/layout';
+import { blank, column, indent, listing } from '../../presentation/layout';
 import type { PruneResult } from './index';
 
 const NAME_WIDTH = 42;
@@ -35,15 +35,6 @@ const line = (assessment: OverrideAssessment): readonly string[] => [
     : []),
 ];
 
-const listing = (
-  title: string,
-  items: readonly OverrideAssessment[]
-): readonly string[] => [
-  blank(),
-  section(title, items.length),
-  ...(items.length === 0 ? [emptyNotice()] : items.flatMap(line)),
-];
-
 const of = (assessments: readonly OverrideAssessment[], verdict: PruneVerdict) =>
   assessments.filter((assessment) => assessment.verdict === verdict);
 
@@ -58,14 +49,14 @@ export const renderPruning = (
     result.projectDir,
     `${result.declaredCount} override declaration(s)`,
 
-    ...listing(`${LABEL.harmful} - pins a lower version than npm would pick`, of(assessments, 'harmful')),
-    ...listing(`${LABEL.ineffective} - the forced version is itself vulnerable`, of(assessments, 'ineffective')),
-    ...listing(`${LABEL.redundant} - npm would resolve to something safe anyway`, of(assessments, 'redundant')),
-    ...listing(`${LABEL.inert} - nothing in the tree to apply to`, of(assessments, 'inert')),
+    ...listing(`${LABEL.harmful} - pins a lower version than npm would pick`, of(assessments, 'harmful'), line),
+    ...listing(`${LABEL.ineffective} - the forced version is itself vulnerable`, of(assessments, 'ineffective'), line),
+    ...listing(`${LABEL.redundant} - npm would resolve to something safe anyway`, of(assessments, 'redundant'), line),
+    ...listing(`${LABEL.inert} - nothing in the tree to apply to`, of(assessments, 'inert'), line),
     ...(of(assessments, 'unknown').length > 0
-      ? listing(`${LABEL.unknown} - not enough information`, of(assessments, 'unknown'))
+      ? listing(`${LABEL.unknown} - not enough information`, of(assessments, 'unknown'), line)
       : []),
-    ...listing(`${LABEL.needed} - still doing real work`, of(assessments, 'needed')),
+    ...listing(`${LABEL.needed} - still doing real work`, of(assessments, 'needed'), line),
 
     blank(),
     ...(result.removable.length === 0

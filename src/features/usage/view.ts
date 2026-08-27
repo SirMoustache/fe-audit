@@ -4,7 +4,7 @@ import type {
   UnreferencedDependency,
   UsedDependency,
 } from '../../domain/usage';
-import { blank, column, emptyNotice, indent, section } from '../../presentation/layout';
+import { blank, column, indent, listing, section } from '../../presentation/layout';
 import type { UsageResult } from './index';
 
 const NAME_WIDTH = 44;
@@ -61,16 +61,6 @@ const deadOverrideLine = (override: DeadOverride): string =>
       NAME_WIDTH
     ) + `"${override.declared}" - nothing in the tree to apply to`
   );
-
-const listing = <T>(
-  title: string,
-  items: readonly T[],
-  toLines: (item: T) => readonly string[]
-): readonly string[] => [
-  blank(),
-  section(title, items.length),
-  ...(items.length === 0 ? [emptyNotice()] : items.flatMap(toLines)),
-];
 
 const CAVEAT = [
   'Evidence is textual: imports, package.json scripts and root config files.',

@@ -1,5 +1,6 @@
 import type { DependencyGraph, OverrideTree, PackageInstance } from './dependency-graph';
-import { SELF } from './override-set';
+import type { OverrideDeclaration } from './override-set';
+import { readDeclarations } from './override-set';
 import type { PackageName, RangeSpec, Version } from './semver-policy';
 import { accepts, isAheadOf, isExactVersion } from './semver-policy';
 
@@ -28,12 +29,6 @@ export type Verdict =
   /** Nothing in the tree for it to act on. */
   | 'inert';
 
-export interface Declaration {
-  readonly name: PackageName;
-  readonly scopeKey: PackageName | null;
-  readonly range: RangeSpec;
-}
-
 export interface Assessment {
   readonly name: PackageName;
   readonly scopeKey: PackageName | null;
@@ -50,26 +45,11 @@ export interface AssessmentInput {
   readonly vulnerableNames?: ReadonlySet<PackageName> | null;
 }
 
-const isTree = (value: unknown): value is OverrideTree =>
-  typeof value === 'object' && value !== null;
-
-/** npm's nested grammar, flattened into one declaration per constraint. */
-export const readDeclarations = (overrides: OverrideTree): readonly Declaration[] =>
-  Object.entries(overrides ?? {}).flatMap(([key, value]) =>
-    isTree(value)
-      ? Object.entries(value).map(([child, range]) =>
-          child === SELF
-            ? { name: key, scopeKey: null, range: range as RangeSpec }
-            : { name: child, scopeKey: key, range: range as RangeSpec }
-        )
-      : [{ name: key, scopeKey: null, range: value }]
-  );
-
 const governedKey = (name: PackageName, instancePath: string): string => `${name}@${instancePath}`;
 
 const governedByAnyScope = (
   graph: DependencyGraph,
-  declarations: readonly Declaration[]
+  declarations: readonly OverrideDeclaration[]
 ): ReadonlySet<string> =>
   new Set(
     declarations
@@ -83,7 +63,7 @@ const governedByAnyScope = (
 
 const instancesUnder = (
   graph: DependencyGraph,
-  declaration: Declaration,
+  declaration: OverrideDeclaration,
   governed: ReadonlySet<string>
 ): readonly PackageInstance[] => {
   const instances = graph.instancesOf(declaration.name);
@@ -105,7 +85,7 @@ const instancesUnder = (
  * case is surfaced loudly rather than failing the build on a guess.
  */
 const verdictFor = (
-  declaration: Declaration,
+  declaration: OverrideDeclaration,
   instance: PackageInstance,
   vulnerableNames: ReadonlySet<PackageName> | null,
   copyCount: number
