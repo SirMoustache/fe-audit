@@ -117,7 +117,7 @@ FE_AUDIT_CACHE_DIR=/tmp/fe-cache node dist/cli.js analyze <dir>
 ## Releasing
 
 CI runs on every push and pull request across Node 18/20/22 on Linux and
-Windows. Releases are cut from `main`.
+Windows. Releases are cut from `master`.
 
 **1. Update the changelog.** Add a section for the new version in
 `CHANGELOG.md`.
