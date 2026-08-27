@@ -12,6 +12,14 @@
     "cli"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SirMoustache/fe-audit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/SirMoustache/fe-audit/issues"
+  },
+  "homepage": "https://github.com/SirMoustache/fe-audit#readme",
   "type": "commonjs",
   "bin": {
     "fe-audit": "dist/cli.js"

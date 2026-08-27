@@ -34,15 +34,15 @@ npx fe-audit analyze ./app --write    # apply the safe ones
 npx fe-audit verify ./app             # confirm they took effect
 ```
 
-| Option                | Meaning                                                    |
-| --------------------- | ---------------------------------------------------------- |
-| `--write`             | Merge the proposed overrides into `package.json`           |
-| `--include-tight`     | Also write overrides that cross an exact pin               |
-| `--omit-dev`          | Only consider production dependencies                      |
-| `--json`              | Emit raw JSON instead of a report                          |
-| `--concurrency <n>`   | Parallel registry lookups (default 12)                     |
-| `--no-cache`          | Ignore the on-disk version cache                           |
-| `--cache-ttl <mins>`  | How long cached versions stay fresh (default 60)           |
+| Option               | Meaning                                          |
+| -------------------- | ------------------------------------------------ |
+| `--write`            | Merge the proposed overrides into `package.json` |
+| `--include-tight`    | Also write overrides that cross an exact pin     |
+| `--omit-dev`         | Only consider production dependencies            |
+| `--json`             | Emit raw JSON instead of a report                |
+| `--concurrency <n>`  | Parallel registry lookups (default 12)           |
+| `--no-cache`         | Ignore the on-disk version cache                 |
+| `--cache-ttl <mins>` | How long cached versions stay fresh (default 60) |
 
 `verify` exits `1` when an override failed to remove a vulnerability, so it is
 safe to gate CI on.
@@ -53,12 +53,12 @@ Resolving published versions is the only slow part of a run, so it is done
 concurrently, over HTTP rather than by spawning `npm view`, with gzip and an
 on-disk cache. Measured on a project with 127 findings across 61 packages:
 
-| | Wall clock |
-| --- | --- |
-| Serial `npm view` per package | 96.0s |
-| Concurrent + cached + HTTP | 27.7s |
-| ...with gzip | **10.6s** |
-| ...warm cache | **9.6s** |
+|                               | Wall clock |
+| ----------------------------- | ---------- |
+| Serial `npm view` per package | 96.0s      |
+| Concurrent + cached + HTTP    | 27.7s      |
+| ...with gzip                  | **10.6s**  |
+| ...warm cache                 | **9.6s**   |
 
 `npm audit` itself accounts for 8.3s of that, so resolution now costs a little
 over a second. Results are byte-identical across all four.
@@ -189,12 +189,17 @@ originally, the two copies disagreed, and the resulting bug survived until
 
 ```bash
 npm install
-npm test        # 62 assertions, no network required
+npm test          # 62 assertions, no network required
 npm run build
+node dist/cli.js analyze /path/to/project
 ```
 
 The cache lives in `os.tmpdir()/fe-audit-cache` unless `FE_AUDIT_CACHE_DIR` says
 otherwise. Deleting it is always safe.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the architecture rules, how to add a
+test, and the release process. Changes are recorded in
+[CHANGELOG.md](CHANGELOG.md).
 
 ## Limitations
 
