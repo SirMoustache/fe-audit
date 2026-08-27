@@ -105,10 +105,15 @@ export const findEscapeVersion = (
 };
 
 export const isAheadOf = (version: Version, range: RangeSpec): boolean => {
+  const floor = rangeFloor(range);
+  return floor !== null && semver.gt(version, floor);
+};
+
+/** The lowest version a range would accept, or `null` if it has none. */
+export const rangeFloor = (range: RangeSpec): Version | null => {
   try {
-    const floor = semver.minVersion(range);
-    return floor !== null && semver.gt(version, floor);
+    return semver.minVersion(normalizeRange(range))?.version ?? null;
   } catch {
-    return false;
+    return null;
   }
 };

@@ -15,6 +15,7 @@ import {
   isExpressible,
 } from '../src/domain/semver-policy';
 import { assessOverrides, readDeclarations } from '../src/domain/verification';
+import { explainPackage, hasForcedBreaking } from '../src/domain/explanation';
 import { groupRemediations } from '../src/features/remediate';
 import { assertUsableReport } from '../src/io/npm-client';
 import { mapWithConcurrency } from '../src/io/pool';
@@ -595,6 +596,76 @@ describe('npm report guard', () => {
   it('passes a normal report through', () => {
     const report: AuditReport = { vulnerabilities: {}, metadata: {} };
     assert.strictEqual(assertUsableReport(report, '/x'), report);
+  });
+});
+
+describe('explanation', () => {
+  // Mirrors the real tmp case: an override forced 0.2.7 onto two consumers
+  // that both declared against it, and no build-time code path revealed it.
+  const forcedGraph = buildDependencyGraph(
+    {
+      lockfileVersion: 3,
+      packages: {
+        '': { dependencies: { app: '^1.0.0' }, devDependencies: { cli: '^1.0.0' } },
+        'node_modules/app': { version: '1.0.0' },
+        'node_modules/cli': { version: '1.0.0', dependencies: { tmp: '^0.1.0' } },
+        'node_modules/editor': { version: '3.1.0', dependencies: { tmp: '^0.0.33' } },
+        'node_modules/tmp': { version: '0.2.7' },
+      },
+    },
+    { manifest: { dependencies: { app: '^1.0.0' }, devDependencies: { cli: '^1.0.0' } } }
+  );
+
+  it('names every consumer that rejects the installed version', () => {
+    const result = explainPackage({ graph: forcedGraph, name: 'tmp', overrides: { tmp: '^0.2.4' } });
+    assert.deepStrictEqual(
+      result.instances[0]!.rejecting.map((c) => `${c.name} ${c.range}`),
+      ['cli ^0.1.0', 'editor ^0.0.33']
+    );
+  });
+
+  it('identifies an override that forced a breaking version', () => {
+    const forced = explainPackage({
+      graph: forcedGraph,
+      name: 'tmp',
+      overrides: { tmp: '^0.2.4' },
+    });
+    assert.strictEqual(hasForcedBreaking(forced), true);
+  });
+
+  it('does not blame an override that is not there', () => {
+    const unforced = explainPackage({ graph: forcedGraph, name: 'tmp' });
+    assert.strictEqual(hasForcedBreaking(unforced), false);
+  });
+
+  it('separates production reach from build-only reach', () => {
+    assert.strictEqual(explainPackage({ graph: forcedGraph, name: 'app' }).production, true);
+    assert.strictEqual(explainPackage({ graph: forcedGraph, name: 'tmp' }).production, false);
+  });
+
+  it('reports a package that is not installed', () => {
+    const missing = explainPackage({ graph: forcedGraph, name: 'nope' });
+    assert.strictEqual(missing.present, false);
+    assert.deepStrictEqual(missing.instances, []);
+  });
+
+  it('explains every copy when several exist', () => {
+    const result = explainPackage({ graph, name: 'ws' });
+    assert.strictEqual(result.instances.length, 2);
+    assert.deepStrictEqual(
+      result.instances.map((instance) => instance.hoisted),
+      [true, false]
+    );
+  });
+
+  it('carries advisory context when the audit provided it', () => {
+    const result = explainPackage({
+      graph: forcedGraph,
+      name: 'tmp',
+      findings: [finding('tmp', '<=0.2.5')],
+    });
+    assert.strictEqual(result.advisory?.range, '<=0.2.5');
+    assert.strictEqual(result.advisory?.ownFlaw, true);
   });
 });
 

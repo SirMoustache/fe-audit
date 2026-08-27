@@ -10,6 +10,14 @@ classification tiers — not just to exported types.
 
 ## [Unreleased]
 
+### Added
+
+- `explain <package> [projectDir]` — shows every installed copy, who declares
+  each one, whether an override is forcing a version against a declared range,
+  and whether the package can reach production code. Answers "why was this
+  classified RISKY" in one command instead of half a dozen lockfile queries.
+- `--skip-audit` for `explain`, to report from the lockfile alone.
+
 ## [1.0.0] - 2026-08-27
 
 ### Added

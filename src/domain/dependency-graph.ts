@@ -65,6 +65,10 @@ export interface DependencyGraph {
   instancesOf(name: PackageName): readonly PackageInstance[];
   consumersOf(name: PackageName): readonly Consumer[];
   consumersOfInstance(instance: PackageInstance): readonly Consumer[];
+  /** What this copy itself declares, with each declaration already resolved. */
+  dependenciesOf(instance: PackageInstance): readonly Consumer[];
+  /** Names reachable from the root's non-dev dependencies, i.e. shipped code. */
+  productionNames(): ReadonlySet<PackageName>;
   isHoisted(instance: PackageInstance): boolean;
   scopeKeysFor(instance: PackageInstance): readonly PackageName[];
   instancesGovernedBy(scopeKey: PackageName, name: PackageName): ReadonlySet<string>;
@@ -192,10 +196,49 @@ export const buildDependencyGraph = (
     (declaration) => declaration.name
   );
 
+  const declarationsByDeclarer = groupBy(
+    [...consumersByName.values()].flat(),
+    (declaration) => declaration.declarerPath
+  );
+
   const instancesOf = (name: PackageName): readonly PackageInstance[] =>
     instancesByName.get(name) ?? [];
 
   const consumersOf = (name: PackageName): readonly Consumer[] => consumersByName.get(name) ?? [];
+
+  const dependenciesOf = (instance: PackageInstance): readonly Consumer[] =>
+    declarationsByDeclarer.get(instance.path) ?? [];
+
+  const instanceAt = (installPath: string): PackageInstance | undefined =>
+    allInstances.find((candidate) => candidate.path === installPath);
+
+  /**
+   * Whether a package can reach shipped code. A ReDoS in a lint cache that runs
+   * on a build agent is not the same risk as one in the application bundle, and
+   * the distinction changes how urgently a finding needs fixing.
+   */
+  let production: Set<PackageName> | null = null;
+  const productionNames = (): ReadonlySet<PackageName> => {
+    if (production) return production;
+
+    const seen = new Set<PackageName>();
+    const queue = (declarationsByDeclarer.get(ROOT) ?? []).filter(
+      (declaration) => declaration.field !== 'devDependencies'
+    );
+
+    while (queue.length > 0) {
+      const declaration = queue.pop() as Consumer;
+      if (!declaration.resolvedPath) continue;
+      const instance = instanceAt(declaration.resolvedPath);
+      if (!instance || seen.has(instance.treeName)) continue;
+      seen.add(instance.treeName);
+      seen.add(instance.name);
+      queue.push(...dependenciesOf(instance));
+    }
+
+    production = seen;
+    return production;
+  };
 
   /** Consumers are matched by the name they declare, which is the tree name. */
   const consumersOfInstance = (instance: PackageInstance): readonly Consumer[] =>
@@ -245,6 +288,8 @@ export const buildDependencyGraph = (
     instancesOf,
     consumersOf,
     consumersOfInstance,
+    dependenciesOf,
+    productionNames,
     isHoisted,
     scopeKeysFor,
     instancesGovernedBy,

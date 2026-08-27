@@ -6,6 +6,8 @@ import { surveyWorkspace } from './features/survey';
 import { renderSurvey } from './features/survey/view';
 import { verifyProject } from './features/verify';
 import { renderVerification } from './features/verify/view';
+import { explainInProject } from './features/explain';
+import { renderExplanation } from './features/explain/view';
 import type { RegistryOptions } from './io/registry';
 import { isProject } from './io/workspace';
 
@@ -15,11 +17,13 @@ fe-audit - classify npm audit findings and generate safe overrides
   npx fe-audit survey [rootDir]              Inventory projects and flag blockers
   npx fe-audit analyze <projectDir> [opts]   Classify findings, propose overrides
   npx fe-audit verify <projectDir>           Check declared overrides took effect
+  npx fe-audit explain <pkg> [projectDir]    Why one package is classified as it is
 
 Options:
   --write               analyze: merge the proposed overrides into package.json
   --include-tight       analyze: also write overrides that cross an exact pin
   --omit-dev            analyze: only consider production dependencies
+  --skip-audit          explain: skip npm audit, report from the lockfile alone
   --json                emit raw JSON instead of a report
   --concurrency <n>     parallel registry lookups (default 12)
   --no-cache            ignore the on-disk version cache
@@ -39,6 +43,7 @@ interface Options {
   readonly write: boolean;
   readonly includeTight: boolean;
   readonly omitDev: boolean;
+  readonly skipAudit: boolean;
   readonly json: boolean;
   readonly cache: boolean;
   readonly concurrency?: number;
@@ -47,7 +52,8 @@ interface Options {
 
 interface Request {
   readonly command: string | undefined;
-  readonly target: string | undefined;
+  /** Bare arguments after the command, in order. */
+  readonly positionals: readonly string[];
   readonly options: Options;
 }
 
@@ -59,9 +65,9 @@ const numericFlag = (args: readonly string[], flag: string): number | undefined 
   return value;
 };
 
-/** A bare word is the target unless it is the value of a preceding value flag. */
-const findTarget = (args: readonly string[]): string | undefined =>
-  args.find(
+/** A bare word is positional unless it is the value of a preceding value flag. */
+const positionalsIn = (args: readonly string[]): readonly string[] =>
+  args.filter(
     (arg, index) => index > 0 && !arg.startsWith('--') && !VALUE_FLAGS.has(args[index - 1] ?? '')
   );
 
@@ -71,11 +77,12 @@ const parseRequest = (argv: readonly string[]): Request => {
   const concurrency = numericFlag(args, '--concurrency');
   return {
     command: args[0],
-    target: findTarget(args),
+    positionals: positionalsIn(args),
     options: {
       write: args.includes('--write'),
       includeTight: args.includes('--include-tight'),
       omitDev: args.includes('--omit-dev'),
+      skipAudit: args.includes('--skip-audit'),
       json: args.includes('--json'),
       cache: !args.includes('--no-cache'),
       ...(concurrency === undefined ? {} : { concurrency }),
@@ -107,13 +114,13 @@ const registryOptionsFrom = (options: Options): RegistryOptions => ({
       }),
 });
 
-const survey = async ({ target, options }: Request): Promise<readonly string[]> => {
-  const result = surveyWorkspace(path.resolve(target ?? process.cwd()));
+const survey = async ({ positionals, options }: Request): Promise<readonly string[]> => {
+  const result = surveyWorkspace(path.resolve(positionals[0] ?? process.cwd()));
   return options.json ? asJson(result) : renderSurvey(result);
 };
 
-const analyze = async ({ target, options }: Request): Promise<readonly string[]> => {
-  const projectDir = resolveProject(target);
+const analyze = async ({ positionals, options }: Request): Promise<readonly string[]> => {
+  const projectDir = resolveProject(positionals[0]);
   const result = await remediateProject(projectDir, {
     omitDev: options.omitDev,
     includeTight: options.includeTight,
@@ -123,16 +130,24 @@ const analyze = async ({ target, options }: Request): Promise<readonly string[]>
   return options.json ? asJson(result) : renderRemediation(result, { write: options.write });
 };
 
-const verify = async ({ target, options }: Request): Promise<readonly string[]> => {
-  const result = verifyProject(resolveProject(target));
+const verify = async ({ positionals, options }: Request): Promise<readonly string[]> => {
+  const result = verifyProject(resolveProject(positionals[0]));
   if (result.failures.length > 0) process.exitCode = 1;
   return options.json ? asJson(result) : renderVerification(result);
+};
+
+const explain = async ({ positionals, options }: Request): Promise<readonly string[]> => {
+  const [name, target] = positionals;
+  if (!name) throw new Error('explain expects a package name: fe-audit explain <pkg> [projectDir]');
+  const result = explainInProject(resolveProject(target), name, { skipAudit: options.skipAudit });
+  return options.json ? asJson(result) : renderExplanation(result);
 };
 
 const COMMANDS: Readonly<Record<string, (request: Request) => Promise<readonly string[]>>> = {
   survey,
   analyze,
   verify,
+  explain,
 };
 
 const HELP = new Set<string | undefined>(['--help', '-h', 'help', undefined]);

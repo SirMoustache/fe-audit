@@ -32,6 +32,7 @@ npx fe-audit survey ./packages        # inventory projects, flag blockers
 npx fe-audit analyze ./app            # classify findings, propose overrides
 npx fe-audit analyze ./app --write    # apply the safe ones
 npx fe-audit verify ./app             # confirm they took effect
+npx fe-audit explain tmp ./app        # why one package is classified as it is
 ```
 
 | Option               | Meaning                                          |
@@ -40,12 +41,51 @@ npx fe-audit verify ./app             # confirm they took effect
 | `--include-tight`    | Also write overrides that cross an exact pin     |
 | `--omit-dev`         | Only consider production dependencies            |
 | `--json`             | Emit raw JSON instead of a report                |
-| `--concurrency <n>`  | Parallel registry lookups (default 12)           |
-| `--no-cache`         | Ignore the on-disk version cache                 |
-| `--cache-ttl <mins>` | How long cached versions stay fresh (default 60) |
+| `--skip-audit`        | `explain` only: report from the lockfile, skip `npm audit` |
+| `--concurrency <n>`   | Parallel registry lookups (default 12)                     |
+| `--no-cache`          | Ignore the on-disk version cache                           |
+| `--cache-ttl <mins>`  | How long cached versions stay fresh (default 60)           |
 
 `verify` exits `1` when an override failed to remove a vulnerability, so it is
 safe to gate CI on.
+
+## Understanding a verdict
+
+When `analyze` refuses to override something, `explain` shows why:
+
+```
+$ npx fe-audit explain tmp ./app
+
+tmp   in /path/to/app
+
+INSTALLED (1 copy)
+
+  node_modules/tmp   0.2.7
+  @sitecore-jss/sitecore-jss-cli@18.0.2         ^0.1.0          REJECTS this version
+  external-editor@3.1.0                         ^0.0.33         REJECTS this version
+
+OVERRIDE
+  "tmp": "^0.2.4"
+
+ADVISORY
+  not currently listed by npm audit
+
+GUIDANCE
+  An override is forcing a version that a consumer declared against.
+  A passing `npm run build` is not evidence this is safe unless the build
+  actually executes that consumer. Confirm the API surface it uses, or
+  upgrade the consumer instead.
+  Not reachable from production - build or tooling only, so the practical risk is lower.
+```
+
+It answers the questions that decide what to do: which copies exist, who asked
+for each one, whether an override is forcing a version against a declared range,
+and whether the package can reach shipped code at all.
+
+That last point matters more than it looks. A hand-written override can force a
+breaking version and still pass `npm run build` — not because it is safe, but
+because the build never executes the code that would fail. `explain` tells you
+which situation you are in.
 
 ## Speed
 
@@ -189,7 +229,7 @@ originally, the two copies disagreed, and the resulting bug survived until
 
 ```bash
 npm install
-npm test          # 62 assertions, no network required
+npm test        # 69 assertions, no network required
 npm run build
 node dist/cli.js analyze /path/to/project
 ```
