@@ -117,29 +117,12 @@ FE_AUDIT_CACHE_DIR=/tmp/fe-cache node dist/cli.js analyze <dir>
 
 ## Releasing
 
-Releases are automated with [changesets](https://github.com/changesets/changesets).
-Nothing is published by hand, and `CHANGELOG.md` is generated — editing it
-directly will be overwritten.
+Releases are automated with changesets. The contributor-facing walkthrough —
+what `npm run changeset` asks, what it writes, and how the **Version Packages**
+pull request turns that into a release — is in
+[the README](README.md#contributing-a-change).
 
-**1. Add a changeset with your change.**
-
-```bash
-npm run changeset
-```
-
-Pick the bump, write the note, and commit the generated file in `.changeset/`
-alongside your code. CI fails a pull request that changes behaviour without one.
-
-Version numbers describe the **CLI contract** — flags, exit codes, report
-structure and the classification tiers — not just exported types. Renaming a
-tier is a breaking change even though no TypeScript type moved, because scripts
-read those names.
-
-**2. Merge to `master`.** CI opens (or updates) a **Version Packages** pull
-request that applies every pending bump and rewrites the changelog.
-
-**3. Merge that pull request.** The same workflow then finds no pending
-changesets and publishes to npm instead.
+`CHANGELOG.md` is generated. Editing it by hand will be overwritten.
 
 The package sits at `0.0.0` until the first release; the initial changeset is a
 `major`, which makes it `1.0.0`.
@@ -150,9 +133,10 @@ The release workflow needs an npm **automation** token with publish rights,
 stored as the repository secret `NPM_TOKEN`
 (_Settings → Secrets and variables → Actions_).
 
-It also needs *Allow GitHub Actions to create and approve pull requests* enabled
-under _Settings → Actions → General_, or the Version Packages PR cannot be
-opened.
+It also needs _Allow GitHub Actions to create and approve pull requests_ enabled
+under _Settings → Actions → General_, or the Version Packages pull request cannot
+be opened. This is the most common first-time failure, and the error message does
+not make the cause obvious.
 
 Publishing sets `NPM_CONFIG_PROVENANCE`, which links the published tarball to the
 commit and workflow that built it. That requires the `id-token: write` permission

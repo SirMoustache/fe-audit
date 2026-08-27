@@ -7,25 +7,10 @@ what changed and how the version should move.
 npm run changeset
 ```
 
-That writes a markdown file here. Commit it alongside your change.
+That writes a randomly-named markdown file here. Commit it with your change.
 
-Releases are cut by merging the **Version Packages** pull request that CI opens
-once changesets are pending. That PR applies the bumps, rewrites
-`../CHANGELOG.md` and publishes to npm.
-
-## Choosing a bump
-
-Version numbers here describe the **CLI contract** — flags, exit codes, report
-structure and the classification tiers — not just exported types.
-
-| Bump | Use for |
-| --- | --- |
-| `patch` | A fix that leaves the contract unchanged |
-| `minor` | A new command, flag or report section |
-| `major` | A renamed tier, a changed exit code, a removed or renamed flag |
-
-Renaming a classification tier is a breaking change even though no TypeScript
-type moved, because scripts read those names.
+The full walkthrough, including what the release pull request looks like, is in
+[the README](../README.md#contributing-a-change).
 
 ## Writing the note
 
@@ -41,4 +26,14 @@ to upgrade. Prefer the consequence over the mechanism:
 rather than the most favourable one any consumer could accept. Overrides that
 were reported as redundant but were in fact holding back a vulnerable
 transitive version are now correctly kept.
+```
+
+Not this:
+
+```md
+---
+'fe-audit': minor
+---
+
+Changed assessInstance to use consensus instead of optimistic.
 ```

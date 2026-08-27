@@ -310,11 +310,113 @@ copy sits in.** Those differ whenever npm hoists. It was implemented twice
 originally, the two copies disagreed, and the resulting bug survived until
 `verify` contradicted `analyze`.
 
+## Contributing a change
+
+Releases are automated with [changesets](https://github.com/changesets/changesets).
+The part that surprises people is that **nothing is published when you merge your
+change** — you describe the change, and a separate pull request does the release.
+
+### 1. Describe your change
+
+After making a code change, record what it means for users:
+
+```
+$ npm run changeset
+
+🦋  Which packages should have a major bump? … (none)
+🦋  Which packages should have a minor bump? … fe-audit
+🦋  Please enter a summary for this change
+    › unused now recognises jest environments named by shorthand
+
+🦋  Changeset added! - you can now commit it
+```
+
+That writes a file with a randomly generated name:
+
+```md
+<!-- .changeset/tidy-moons-repeat.md -->
+---
+'fe-audit': minor
+---
+
+`unused` now recognises jest environments named by shorthand, so
+`jest-environment-jsdom` is no longer reported as unreferenced when
+`jest.config.js` sets `testEnvironment: "jsdom"`.
+```
+
+The random name is deliberate: it never collides when two branches add one at
+once. **Commit this file with your code.** Your `package.json` version does not
+change, and neither does `CHANGELOG.md` — not yet.
+
+CI fails a pull request that changes behaviour without a changeset, which is what
+stops the changelog drifting from what actually shipped.
+
+### 2. Merge your pull request
+
+Nothing is published. The changeset simply sits in `.changeset/`, waiting.
+
+You can see what is pending at any time:
+
+```
+$ npx changeset status
+
+Packages to be bumped:
+- minor
+  - fe-audit
+```
+
+### 3. Merge the Version Packages pull request
+
+CI opens — and keeps updating — a pull request titled **chore: version
+packages**. It collects every pending changeset and shows exactly what the
+release will be:
+
+```diff
+  package.json
+- "version": "1.2.0"
++ "version": "1.3.0"
+
+  CHANGELOG.md
++ ## 1.3.0
++
++ ### Minor Changes
++
++ - `unused` now recognises jest environments named by shorthand, so
++   `jest-environment-jsdom` is no longer reported as unreferenced when
++   `jest.config.js` sets `testEnvironment: "jsdom"`.
+
+  .changeset/tidy-moons-repeat.md   (deleted — it has been folded in)
+```
+
+Merging that pull request publishes to npm. Reviewing it is the moment to decide
+whether the accumulated changes really are a minor, and whether the notes read
+well together.
+
+### Choosing a bump
+
+Version numbers here describe the **CLI contract** — flags, exit codes, report
+structure and the classification tiers — not just exported types.
+
+| Bump | Use for |
+| --- | --- |
+| `patch` | A fix that leaves the contract unchanged |
+| `minor` | A new command, flag or report section |
+| `major` | A renamed tier, a changed exit code, a removed or renamed flag |
+
+Renaming a classification tier is a breaking change even though no TypeScript
+type moved, because scripts read those names.
+
+### Why not just bump the version in the pull request?
+
+Two branches would both edit `package.json` and conflict every time. Worse, a
+version chosen at authoring time is stale by the time it merges. Describing the
+*intent* and resolving it at release time avoids both.
+
 ## Development
 
 ```bash
 npm install
-npm test        # 91 assertions, no network required
+npm test          # 91 assertions, no network required
 npm run build
 node dist/cli.js analyze /path/to/project
 ```
@@ -322,9 +424,9 @@ node dist/cli.js analyze /path/to/project
 The cache lives in `os.tmpdir()/fe-audit-cache` unless `FE_AUDIT_CACHE_DIR` says
 otherwise. Deleting it is always safe.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the architecture rules, how to add a
-test, and the release process. Changes are recorded in
-[CHANGELOG.md](CHANGELOG.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the architecture rules, where a change
+belongs, and how to add a test. Releases are generated from changesets, so
+[CHANGELOG.md](CHANGELOG.md) is never edited by hand.
 
 ## Limitations
 
