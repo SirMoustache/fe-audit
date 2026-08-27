@@ -8,6 +8,8 @@ import { verifyProject } from './features/verify';
 import { renderVerification } from './features/verify/view';
 import { explainInProject } from './features/explain';
 import { renderExplanation } from './features/explain/view';
+import { analyseProjectUsage } from './features/usage';
+import { renderUsage } from './features/usage/view';
 import type { RegistryOptions } from './io/registry';
 import { isProject } from './io/workspace';
 
@@ -18,12 +20,13 @@ fe-audit - classify npm audit findings and generate safe overrides
   npx fe-audit analyze <projectDir> [opts]   Classify findings, propose overrides
   npx fe-audit verify <projectDir>           Check declared overrides took effect
   npx fe-audit explain <pkg> [projectDir]    Why one package is classified as it is
+  npx fe-audit unused [projectDir]           Declared but unreferenced dependencies
 
 Options:
   --write               analyze: merge the proposed overrides into package.json
   --include-tight       analyze: also write overrides that cross an exact pin
   --omit-dev            analyze: only consider production dependencies
-  --skip-audit          explain: skip npm audit, report from the lockfile alone
+  --skip-audit          explain/unused: skip npm audit, use the lockfile alone
   --json                emit raw JSON instead of a report
   --concurrency <n>     parallel registry lookups (default 12)
   --no-cache            ignore the on-disk version cache
@@ -143,11 +146,19 @@ const explain = async ({ positionals, options }: Request): Promise<readonly stri
   return options.json ? asJson(result) : renderExplanation(result);
 };
 
+const unused = async ({ positionals, options }: Request): Promise<readonly string[]> => {
+  const result = analyseProjectUsage(resolveProject(positionals[0]), {
+    skipAudit: options.skipAudit,
+  });
+  return options.json ? asJson(result) : renderUsage(result);
+};
+
 const COMMANDS: Readonly<Record<string, (request: Request) => Promise<readonly string[]>>> = {
   survey,
   analyze,
   verify,
   explain,
+  unused,
 };
 
 const HELP = new Set<string | undefined>(['--help', '-h', 'help', undefined]);

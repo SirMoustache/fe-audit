@@ -16,7 +16,11 @@ classification tiers — not just to exported types.
   each one, whether an override is forcing a version against a declared range,
   and whether the package can reach production code. Answers "why was this
   classified RISKY" in one command instead of half a dozen lockfile queries.
-- `--skip-audit` for `explain`, to report from the lockfile alone.
+- `unused [projectDir]` — declared dependencies with no import, script or config
+  reference; imports that were never declared; and overrides that no longer
+  apply to anything. Each unreferenced dependency reports the packages, and the
+  vulnerable packages, that would leave the tree with it.
+- `--skip-audit` for `explain` and `unused`, to report from the lockfile alone.
 
 ## [1.0.0] - 2026-08-27
 

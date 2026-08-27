@@ -8,6 +8,7 @@ const NESTED = '/node_modules/';
 export interface LockfileEntry {
   readonly name?: string;
   readonly version?: Version;
+  readonly bin?: string | Readonly<Record<string, string>>;
   readonly dependencies?: Readonly<Record<string, RangeSpec>>;
   readonly devDependencies?: Readonly<Record<string, RangeSpec>>;
   readonly optionalDependencies?: Readonly<Record<string, RangeSpec>>;
@@ -22,6 +23,7 @@ export interface Lockfile {
 
 export interface Manifest {
   readonly name?: string;
+  readonly scripts?: Readonly<Record<string, string>>;
   readonly dependencies?: Readonly<Record<string, RangeSpec>>;
   readonly devDependencies?: Readonly<Record<string, RangeSpec>>;
   readonly optionalDependencies?: Readonly<Record<string, RangeSpec>>;

@@ -16,6 +16,8 @@ import {
 } from '../src/domain/semver-policy';
 import { assessOverrides, readDeclarations } from '../src/domain/verification';
 import { explainPackage, hasForcedBreaking } from '../src/domain/explanation';
+import { analyseUsage } from '../src/domain/usage';
+import { parseJsonc, specifierToPackage } from '../src/io/source-scanner';
 import { groupRemediations } from '../src/features/remediate';
 import { assertUsableReport } from '../src/io/npm-client';
 import { mapWithConcurrency } from '../src/io/pool';
@@ -582,6 +584,134 @@ describe('remediate grouping', () => {
     assert.deepStrictEqual(groups.risky.map((r) => r.name), ['css-select']);
     assert.deepStrictEqual(groups.tight.map((r) => r.name), ['cookie']);
     assert.deepStrictEqual(groups.scoped.map((r) => r.name), ['minimatch']);
+  });
+});
+
+describe('source scanning', () => {
+  it('maps a specifier to the package that owns it', () => {
+    assert.strictEqual(specifierToPackage('lodash/merge'), 'lodash');
+    assert.strictEqual(specifierToPackage('@scope/pkg/sub'), '@scope/pkg');
+  });
+
+  it('ignores anything that is not an installed package', () => {
+    for (const specifier of ['./local', '../up', '/abs', 'node:fs', 'fs', 'path']) {
+      assert.strictEqual(specifierToPackage(specifier), null, specifier);
+    }
+  });
+
+  it('ignores unresolved template literals', () => {
+    assert.strictEqual(specifierToPackage('${component.path}'), null);
+  });
+
+  it('ignores tsconfig path aliases', () => {
+    const aliases = new Set(['components', '@/jaden-ui']);
+    assert.strictEqual(specifierToPackage('components/Card', aliases), null);
+    assert.strictEqual(specifierToPackage('@/jaden-ui/Button', aliases), null);
+    assert.strictEqual(specifierToPackage('react', aliases), 'react');
+  });
+
+  it('strips comments without being confused by glob patterns', () => {
+    // `components/*` and `**/*.ts` contain /* and */, so a regex-based
+    // comment stripper swallows everything between them.
+    const config = parseJsonc<{ compilerOptions: { paths: Record<string, string[]> } }>(`{
+      "compilerOptions": {
+        // "components/*": ["src/old/*"],
+        "paths": { "components/*": ["src/components/*"] }
+      },
+      /* block */
+      "include": ["**/*.ts"],
+    }`);
+    assert.deepStrictEqual(Object.keys(config.compilerOptions.paths), ['components/*']);
+  });
+});
+
+describe('usage', () => {
+  const usageGraph = buildDependencyGraph(
+    {
+      lockfileVersion: 3,
+      packages: {
+        '': { dependencies: { react: '^18.0.0' }, devDependencies: { eslint: '^7.0.0' } },
+        'node_modules/react': { version: '18.2.0' },
+        'node_modules/eslint': { version: '7.32.0', bin: { eslint: 'bin/eslint.js' } },
+        'node_modules/eslint-plugin-react': { version: '7.21.5' },
+        'node_modules/mui': { version: '5.0.0', peerDependencies: { '@emotion/react': '^11' } },
+        'node_modules/@emotion/react': { version: '11.10.5' },
+        'node_modules/ngrok': { version: '4.0.0', dependencies: { request: '^2.88.0' } },
+        'node_modules/request': { version: '2.88.2' },
+        'node_modules/@types/react': { version: '18.2.28' },
+      },
+    },
+    { manifest: {} }
+  );
+
+  const declared = [
+    { name: 'react', field: 'dependencies', range: '^18.0.0' },
+    { name: 'eslint', field: 'devDependencies', range: '^7.0.0' },
+    { name: 'eslint-plugin-react', field: 'devDependencies', range: '^7.21.5' },
+    { name: 'mui', field: 'dependencies', range: '^5.0.0' },
+    { name: '@emotion/react', field: 'dependencies', range: '^11.0.0' },
+    { name: 'ngrok', field: 'devDependencies', range: '^4.0.0' },
+    { name: '@types/react', field: 'devDependencies', range: '^18.2.28' },
+  ];
+
+  const report = analyseUsage({
+    graph: usageGraph,
+    declared,
+    imports: new Map([
+      ['react', ['src/App.tsx']],
+      ['mui', ['src/App.tsx']],
+      ['left-pad', ['src/util.ts']],
+    ]),
+    // eslint's plugin is named in shorthand, as eslint configs always do.
+    configText: new Map([['.eslintrc', '{ "plugins": ["react"] }']]),
+    scripts: { lint: 'eslint ./src' },
+    binNames: new Map([['eslint', ['eslint']]]),
+    overrides: { 'no-longer-here': '1.0.0' },
+    findings: [finding('request', '<=2.88.2')],
+  });
+
+  const kindsFor = (name: string) =>
+    report.used.find((entry) => entry.name === name)?.evidence.map((e) => e.kind) ?? [];
+
+  it('recognises an import', () => {
+    assert.strictEqual(kindsFor('react').includes('imported'), true);
+  });
+
+  it('recognises a package invoked by its bin in a script', () => {
+    assert.deepStrictEqual(kindsFor('eslint'), ['script']);
+  });
+
+  it('recognises a plugin named by its tool shorthand', () => {
+    assert.deepStrictEqual(kindsFor('eslint-plugin-react'), ['config']);
+  });
+
+  it('recognises a peer dependency of a used package', () => {
+    assert.deepStrictEqual(kindsFor('@emotion/react'), ['peer-of']);
+  });
+
+  it('recognises types for a used package', () => {
+    assert.deepStrictEqual(kindsFor('@types/react'), ['types-for']);
+  });
+
+  it('reports only genuinely unreferenced dependencies', () => {
+    assert.deepStrictEqual(report.unreferenced.map((entry) => entry.name), ['ngrok']);
+  });
+
+  it('quantifies what removing an unused dependency would drop', () => {
+    const ngrok = report.unreferenced[0]!;
+    assert.deepStrictEqual(ngrok.carriesVulnerable, ['request']);
+    assert.strictEqual(ngrok.subtreeSize, 1);
+  });
+
+  it('reports an import that was never declared', () => {
+    assert.deepStrictEqual(
+      report.phantom.map((entry) => [entry.name, entry.resolvable]),
+      [['left-pad', false]]
+    );
+  });
+
+  it('reports an override with nothing left to apply to', () => {
+    assert.deepStrictEqual(report.deadOverrides.map((entry) => entry.name), ['no-longer-here']);
   });
 });
 

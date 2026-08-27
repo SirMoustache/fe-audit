@@ -10,8 +10,10 @@ export * from './domain/override-set';
 export * from './domain/verification';
 export * from './domain/project-health';
 export * from './domain/explanation';
+export * from './domain/usage';
 
 export { surveyWorkspace } from './features/survey';
 export { remediateProject, applyOverrides, groupRemediations } from './features/remediate';
 export { verifyProject } from './features/verify';
 export { explainInProject } from './features/explain';
+export { analyseProjectUsage } from './features/usage';

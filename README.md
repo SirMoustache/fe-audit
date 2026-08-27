@@ -33,18 +33,19 @@ npx fe-audit analyze ./app            # classify findings, propose overrides
 npx fe-audit analyze ./app --write    # apply the safe ones
 npx fe-audit verify ./app             # confirm they took effect
 npx fe-audit explain tmp ./app        # why one package is classified as it is
+npx fe-audit unused ./app             # declared but unreferenced dependencies
 ```
 
-| Option               | Meaning                                          |
-| -------------------- | ------------------------------------------------ |
-| `--write`            | Merge the proposed overrides into `package.json` |
-| `--include-tight`    | Also write overrides that cross an exact pin     |
-| `--omit-dev`         | Only consider production dependencies            |
-| `--json`             | Emit raw JSON instead of a report                |
-| `--skip-audit`        | `explain` only: report from the lockfile, skip `npm audit` |
-| `--concurrency <n>`   | Parallel registry lookups (default 12)                     |
-| `--no-cache`          | Ignore the on-disk version cache                           |
-| `--cache-ttl <mins>`  | How long cached versions stay fresh (default 60)           |
+| Option               | Meaning                                                     |
+| -------------------- | ----------------------------------------------------------- |
+| `--write`            | Merge the proposed overrides into `package.json`            |
+| `--include-tight`    | Also write overrides that cross an exact pin                |
+| `--omit-dev`         | Only consider production dependencies                       |
+| `--json`             | Emit raw JSON instead of a report                           |
+| `--skip-audit`       | `explain`/`unused` only: use the lockfile, skip `npm audit` |
+| `--concurrency <n>`  | Parallel registry lookups (default 12)                      |
+| `--no-cache`         | Ignore the on-disk version cache                            |
+| `--cache-ttl <mins>` | How long cached versions stay fresh (default 60)            |
 
 `verify` exits `1` when an override failed to remove a vulnerability, so it is
 safe to gate CI on.
@@ -173,6 +174,52 @@ A naive major-number comparison waves all three through.
 override is global, so it would land on the hoisted copy and force a version on
 consumers that were never examined. Those are reported for review, not guessed at.
 
+## Finding dependencies you no longer need
+
+The cheapest way to fix a vulnerability is to delete whatever pulled it in.
+
+```
+$ npx fe-audit unused ./app
+
+UNREFERENCED - declared but no reference found (3)
+  ngrok                       devDependencies    1 vulnerable, 40 packages
+      carries: request
+  caniuse-lite                dependencies       no transitive packages
+  react-apollo                dependencies       7 packages
+
+Removing the unreferenced dependencies above would drop 2 vulnerable package(s)
+that nothing else needs.
+
+PHANTOM - imported but not declared (4)
+  webpack                     NOT INSTALLED          scripts/build.js
+  prop-types                  resolves by hoisting   src/components/dynamicList/index.jsx
+```
+
+Three things it reports:
+
+- **UNREFERENCED** — declared, but no import, script or config reference found.
+  Each shows how many packages, and how many _vulnerable_ packages, would leave
+  the tree with it. Only packages nothing else needs are counted.
+- **PHANTOM** — imported but never declared. `resolves by hoisting` means it
+  works today only because something else installs it; `NOT INSTALLED` means
+  that code path is already broken.
+- **DEAD OVERRIDES** — overrides for packages no longer in the tree.
+
+### On trusting it
+
+Usage detection is textual: imports, `package.json` scripts, and root config
+files. That is not proof, so the output is evidence rather than a verdict, and
+nothing is ever removed automatically.
+
+It does understand the conventions that make naive scanners cry wolf — tool
+shorthand (`.eslintrc` says `"react"` for `eslint-plugin-react`, jest says
+`"jsdom"` for `jest-environment-jsdom`), binaries invoked from scripts,
+`@types/*` packages the compiler loads implicitly, peer dependencies of packages
+you do use, and `tsconfig` path aliases. On a real 1,182-file project those
+conventions took the candidate list from 21 to 6.
+
+Remove one at a time, with a build and test run between each.
+
 ## Why `overrides` rather than `npm audit fix`
 
 Measured on the same project:
@@ -229,7 +276,7 @@ originally, the two copies disagreed, and the resulting bug survived until
 
 ```bash
 npm install
-npm test        # 69 assertions, no network required
+npm test        # 83 assertions, no network required
 npm run build
 node dist/cli.js analyze /path/to/project
 ```
