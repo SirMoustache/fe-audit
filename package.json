@@ -38,12 +38,16 @@
     "clean": "tsc --build tsconfig.build.json --clean",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "tsc -p tsconfig.json && node .tmp-test/test/fe-audit.test.js",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "npm run build && changeset publish",
     "prepublishOnly": "npm run clean && npm run build && npm test"
   },
   "dependencies": {
     "semver": "^7.6.3"
   },
   "devDependencies": {
+    "@changesets/cli": "^3.0.1",
     "@types/node": "^20.14.0",
     "@types/semver": "^7.5.8",
     "typescript": "^5.5.4"

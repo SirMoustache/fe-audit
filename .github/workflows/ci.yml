@@ -37,3 +37,24 @@ jobs:
       # The published artefact is dist/, so prove the compiled CLI runs.
       - name: Smoke-test the CLI
         run: node dist/cli.js --help
+
+  changeset:
+    # A user-visible change with no changeset silently ships undocumented, which
+    # is how a changelog drifts from what actually happened.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Check for a changeset
+        run: npx changeset status --since=origin/${{ github.base_ref }}

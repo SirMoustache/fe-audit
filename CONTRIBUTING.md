@@ -21,6 +21,7 @@ There is no watch mode by design — the suite runs in about a second.
 | `npm run typecheck` | Types only, no emit — what CI gates on          |
 | `npm run build`     | Compiles `src` to `dist` with declarations      |
 | `npm run clean`     | Removes `dist` and build info                   |
+| `npm run changeset` | Records a change and its version bump           |
 
 Two TypeScript configs, deliberately:
 
@@ -116,67 +117,60 @@ FE_AUDIT_CACHE_DIR=/tmp/fe-cache node dist/cli.js analyze <dir>
 
 ## Releasing
 
-CI runs on every push and pull request across Node 18/20/22 on Linux and
-Windows. Releases are cut from `master`.
+Releases are automated with [changesets](https://github.com/changesets/changesets).
+Nothing is published by hand, and `CHANGELOG.md` is generated — editing it
+directly will be overwritten.
 
-**1. Update the changelog.** Move the `[Unreleased]` entries into a section for
-the new version, and leave a fresh empty `[Unreleased]` above it.
-
-**2. Bump the version.** This commits and tags in one step:
+**1. Add a changeset with your change.**
 
 ```bash
-npm version patch   # or minor / major
+npm run changeset
 ```
 
-The package sits at `0.0.0` until the first release, so cut that one explicitly:
+Pick the bump, write the note, and commit the generated file in `.changeset/`
+alongside your code. CI fails a pull request that changes behaviour without one.
 
-```bash
-npm version 1.0.0
-```
+Version numbers describe the **CLI contract** — flags, exit codes, report
+structure and the classification tiers — not just exported types. Renaming a
+tier is a breaking change even though no TypeScript type moved, because scripts
+read those names.
 
-Use semver against the _CLI contract_ — flags, exit codes, report structure and
-the classification tiers. Renaming a tier or changing an exit code is a breaking
-change even if no types moved.
+**2. Merge to `master`.** CI opens (or updates) a **Version Packages** pull
+request that applies every pending bump and rewrites the changelog.
 
-**3. Push the commit and tag:**
+**3. Merge that pull request.** The same workflow then finds no pending
+changesets and publishes to npm instead.
 
-```bash
-git push --follow-tags
-```
-
-**4. Create a GitHub release** for the tag. That triggers
-`.github/workflows/publish.yml`, which reinstalls, tests, builds and publishes.
-
-`prepublishOnly` re-runs clean, build and test, so a broken build cannot ship
-even if published by hand.
+The package sits at `0.0.0` until the first release; the initial changeset is a
+`major`, which makes it `1.0.0`.
 
 ### One-time publishing setup
 
-The publish workflow needs an npm **automation** token with publish rights,
+The release workflow needs an npm **automation** token with publish rights,
 stored as the repository secret `NPM_TOKEN`
 (_Settings → Secrets and variables → Actions_).
 
-The workflow publishes with `--provenance`, which requires the `id-token: write`
-permission it already declares, and a `repository` field in `package.json`
-pointing at this repository — both are in place. Provenance links the published
-tarball to the commit and workflow that built it, which is worth keeping.
+It also needs *Allow GitHub Actions to create and approve pull requests* enabled
+under _Settings → Actions → General_, or the Version Packages PR cannot be
+opened.
 
-The first publish of a new package name must be done once by hand (or with
-`--access public` already set, as it is here) before automation takes over.
+Publishing sets `NPM_CONFIG_PROVENANCE`, which links the published tarball to the
+commit and workflow that built it. That requires the `id-token: write` permission
+the workflow already declares and the `repository` field in `package.json`.
 
 ### Publishing by hand
 
 Only if CI is unavailable:
 
 ```bash
-npm run clean && npm run build && npm test
-npm pack --dry-run     # confirm dist/ + README + LICENSE, and nothing else
-npm publish --access public
+npx changeset version     # applies bumps, rewrites the changelog
+npm run release           # builds and publishes
 ```
 
-Check `npm pack --dry-run` before every manual publish. The `files` field limits
-the tarball to `dist` and `README.md`; a stray addition there ships source or
-tests to every consumer.
+`prepublishOnly` re-runs clean, build and test, so a broken build cannot ship
+even by this route. Check `npm pack --dry-run` first: the `files` field limits
+the tarball to `dist` and `README.md`, and a stray addition there ships source
+or tests to every consumer.
 
 ## Troubleshooting
 
