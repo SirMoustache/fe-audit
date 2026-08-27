@@ -1,6 +1,6 @@
 {
   "name": "fe-audit",
-  "version": "1.0.0",
+  "version": "0.0.0",
   "description": "Classify npm audit findings and generate overrides that are safe to apply",
   "keywords": [
     "npm",

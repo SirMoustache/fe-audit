@@ -119,13 +119,19 @@ FE_AUDIT_CACHE_DIR=/tmp/fe-cache node dist/cli.js analyze <dir>
 CI runs on every push and pull request across Node 18/20/22 on Linux and
 Windows. Releases are cut from `master`.
 
-**1. Update the changelog.** Add a section for the new version in
-`CHANGELOG.md`.
+**1. Update the changelog.** Move the `[Unreleased]` entries into a section for
+the new version, and leave a fresh empty `[Unreleased]` above it.
 
 **2. Bump the version.** This commits and tags in one step:
 
 ```bash
 npm version patch   # or minor / major
+```
+
+The package sits at `0.0.0` until the first release, so cut that one explicitly:
+
+```bash
+npm version 1.0.0
 ```
 
 Use semver against the _CLI contract_ — flags, exit codes, report structure and

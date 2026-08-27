@@ -10,30 +10,11 @@ classification tiers — not just to exported types.
 
 ## [Unreleased]
 
-### Added
-
-- `explain <package> [projectDir]` — shows every installed copy, who declares
-  each one, whether an override is forcing a version against a declared range,
-  and whether the package can reach production code. Answers "why was this
-  classified RISKY" in one command instead of half a dozen lockfile queries.
-- `unused [projectDir]` — declared dependencies with no import, script or config
-  reference; imports that were never declared; and overrides that no longer
-  apply to anything. Each unreferenced dependency reports the packages, and the
-  vulnerable packages, that would leave the tree with it.
-- `prune [projectDir]` — finds overrides that are no longer earning their place:
-  redundant ones npm would resolve safely anyway, *harmful* ones pinning below
-  what every consumer accepts, inert ones with nothing to apply to, and
-  ineffective ones whose forced version is itself vulnerable. Advisory ranges
-  come from npm's advisory API, because a working override removes the package
-  from `npm audit` entirely. On a real project: 45 declarations to 15, audit
-  unchanged.
-- `--skip-audit` for `explain` and `unused`, to report from the lockfile alone.
-
-## [1.0.0] - 2026-08-27
+Nothing has been released yet. Everything below ships in the first version.
 
 ### Added
 
-- `survey`, `analyze` and `verify` commands.
+- `survey`, `analyze`, `verify`, `explain`, `unused` and `prune` commands.
 - Classification of every audit finding as `SAFE`, `SCOPED`, `TIGHT`, `RISKY`,
   `DIRECT`, `WITHHELD` or `INHERITED`, based on whether the patched version
   satisfies every consumer's declared range in the lockfile.
@@ -41,9 +22,21 @@ classification tiers — not just to exported types.
   to opt into overrides that cross an exact pin.
 - `verify`, which cross-references the live audit and exits non-zero only when an
   override demonstrably failed to remove a vulnerability.
+- `explain <package>` — every installed copy, who declares each one, whether an
+  override is forcing a version against a declared range, and whether the package
+  can reach production code.
+- `unused` — declared dependencies with no import, script or config reference;
+  imports that were never declared; and overrides that no longer apply. Each
+  unreferenced dependency reports the packages, and the vulnerable packages, that
+  would leave the tree with it.
+- `prune` — overrides that no longer earn their place: redundant ones npm would
+  resolve safely anyway, *harmful* ones pinning below what every consumer
+  accepts, inert ones with nothing to apply to, and ineffective ones whose forced
+  version is itself vulnerable. Advisory ranges come from npm's advisory API,
+  because a working override removes the package from `npm audit` entirely.
 - Concurrent version resolution over HTTP with gzip and an on-disk cache:
   96.0s to 10.6s cold, 9.6s warm, on a project with 127 findings.
-- `--concurrency`, `--no-cache` and `--cache-ttl` to control resolution.
+- `--concurrency`, `--no-cache`, `--cache-ttl` and `--skip-audit`.
 - Programmatic API exporting the pure domain.
 
 ### Safeguards
@@ -51,8 +44,8 @@ classification tiers — not just to exported types.
 These exist because each one was a real failure, found by testing the tool
 against production repositories:
 
-- Never forces a breaking version on a consumer that declared otherwise —
-  the failure that makes `npm audit` green while breaking the build.
+- Never forces a breaking version on a consumer that declared otherwise — the
+  failure that makes `npm audit` green while breaking the build.
 - Treats `0.x` minor and `0.0.z` patch bumps as breaking, since `^0.21.0` and
   `^0.0.1` pin narrowly.
 - Never writes a top-level override for a direct dependency, which npm rejects
@@ -64,8 +57,9 @@ against production repositories:
   override would land on the hoisted copy instead.
 - Withholds a target when two copies of one parent need different versions,
   rather than silently keeping whichever came last.
-- Surfaces a registry outage or an `npm audit` error rather than reading either
-  as "no vulnerabilities found".
+- Judges override necessity against the version npm would actually install, not
+  the most favourable one a consumer could accept.
+- Surfaces a registry outage, an advisory-service failure or an `npm audit` error
+  rather than reading any of them as "nothing to worry about".
 
-[Unreleased]: https://github.com/SirMoustache/fe-audit/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/SirMoustache/fe-audit/releases/tag/v1.0.0
+[Unreleased]: https://github.com/SirMoustache/fe-audit/commits/master
