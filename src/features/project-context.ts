@@ -1,6 +1,6 @@
 import { buildDependencyGraph } from '../domain/dependency-graph';
 import type { DependencyGraph, Lockfile, Manifest, OverrideTree } from '../domain/dependency-graph';
-import type { Finding } from '../domain/finding';
+import type { AuditReport, Finding } from '../domain/finding';
 import { readFindings } from '../domain/finding';
 import { audit } from '../infrastructure/npm-client';
 import { readLockfile, readManifest } from '../infrastructure/workspace';
@@ -49,15 +49,21 @@ export interface AuditContext {
 /**
  * Advisory context is useful but not essential: a project that cannot be
  * audited can still be reported on from its lockfile alone.
+ *
+ * Only the audit call is treated as fallible. Wrapping `readFindings` too would
+ * let a parsing defect present itself as a missing-network condition — the same
+ * failure as reading npm's `{"error":...}` payload as "no vulnerabilities".
  */
 export const loadAudit = (
   projectDir: string,
   { skip = false }: { skip?: boolean } = {}
 ): AuditContext => {
   if (skip) return { findings: [], status: 'skipped' };
+  let report: AuditReport;
   try {
-    return { findings: readFindings(audit(projectDir)), status: 'ok' };
+    report = audit(projectDir);
   } catch {
     return { findings: [], status: 'unavailable' };
   }
+  return { findings: readFindings(report), status: 'ok' };
 };

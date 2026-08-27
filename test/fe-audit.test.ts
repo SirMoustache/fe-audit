@@ -1,4 +1,7 @@
 import assert from 'node:assert';
+import fs from 'node:fs';
+import path from 'node:path';
+import { builtinModules } from 'node:module';
 import type { Lockfile } from '../src/domain/dependency-graph';
 import { buildDependencyGraph, lookupChain } from '../src/domain/dependency-graph';
 import type { AuditEntry, AuditReport } from '../src/domain/finding';
@@ -890,6 +893,55 @@ describe('explanation', () => {
     });
     assert.strictEqual(result.advisory?.range, '<=0.2.5');
     assert.strictEqual(result.advisory?.ownFlaw, true);
+  });
+});
+
+/**
+ * The domain's purity is why the suite runs offline in a second, and until now
+ * it was enforced only by prose in CONTRIBUTING. One hurried import is enough
+ * to lose it, and nothing would fail.
+ *
+ * This reads the source rather than the compiled output because `import type`
+ * is erased at build time — a type-only import from infrastructure still points
+ * the dependency the wrong way in the code people read and edit.
+ */
+describe('layer boundaries', () => {
+  const domainDir = path.resolve(__dirname, '../../src/domain');
+
+  const sources = fs
+    .readdirSync(domainDir)
+    .filter((name) => name.endsWith('.ts'))
+    .map((name) => ({ name, text: fs.readFileSync(path.join(domainDir, name), 'utf8') }));
+
+  const specifiersIn = (text: string): string[] =>
+    [
+      ...text.matchAll(
+        /(?:from|require\()\s*['"]([^'"]+)['"]|^\s*import\s+['"]([^'"]+)['"]/gm
+      ),
+    ].map((m) => (m[1] ?? m[2]) as string);
+
+  it('finds the domain sources it is meant to be policing', () => {
+    // Guards against the check passing vacuously if the folder is ever moved.
+    assert.ok(sources.length >= 5, `expected domain sources, found ${sources.length}`);
+    assert.ok(sources.some((s) => s.name === 'remediation.ts'));
+  });
+
+  it('domain imports nothing from an outer layer', () => {
+    const outward = sources.flatMap(({ name, text }) =>
+      specifiersIn(text)
+        .filter((spec) => /(^|\/)(infrastructure|features|presentation)\//.test(spec))
+        .map((spec) => `${name} -> ${spec}`)
+    );
+    assert.deepStrictEqual(outward, []);
+  });
+
+  it('domain reaches no platform capability', () => {
+    const platform = sources.flatMap(({ name, text }) =>
+      specifiersIn(text)
+        .filter((spec) => builtinModules.includes(spec.replace(/^node:/, '')))
+        .map((spec) => `${name} -> ${spec}`)
+    );
+    assert.deepStrictEqual(platform, []);
   });
 });
 
