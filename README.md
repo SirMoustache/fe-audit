@@ -34,27 +34,27 @@ npx fe-audit analyze ./app --write    # apply the safe ones
 npx fe-audit verify ./app             # confirm they took effect
 ```
 
-| Option | Meaning |
-| --- | --- |
-| `--write` | Merge the proposed overrides into `package.json` |
-| `--include-tight` | Also write overrides that cross an exact pin |
-| `--omit-dev` | Only consider production dependencies |
-| `--json` | Emit raw JSON instead of a report |
+| Option            | Meaning                                          |
+| ----------------- | ------------------------------------------------ |
+| `--write`         | Merge the proposed overrides into `package.json` |
+| `--include-tight` | Also write overrides that cross an exact pin     |
+| `--omit-dev`      | Only consider production dependencies            |
+| `--json`          | Emit raw JSON instead of a report                |
 
 `verify` exits `1` when an override failed to remove a vulnerability, so it is
 safe to gate CI on.
 
 ## How findings are classified
 
-| Tier | Meaning |
-| --- | --- |
-| **SAFE** | Every consumer's range accepts the patched version. Written by default. |
-| **SCOPED** | A nested copy needs its own version. Emitted as a scoped override. |
-| **TIGHT** | A consumer pinned exactly, but the bump is non-breaking. Opt in with `--include-tight`. |
-| **RISKY** | Would force a breaking change on an unwilling consumer. **Refused.** |
-| **DIRECT** | A direct dependency. Upgrade `package.json`; npm rejects overriding it. |
-| **WITHHELD** | Two copies of one parent need different targets; npm cannot express both. |
-| **INHERITED** | No flaw of its own. Clears for free once its parent is fixed. |
+| Tier          | Meaning                                                                                 |
+| ------------- | --------------------------------------------------------------------------------------- |
+| **SAFE**      | Every consumer's range accepts the patched version. Written by default.                 |
+| **SCOPED**    | A nested copy needs its own version. Emitted as a scoped override.                      |
+| **TIGHT**     | A consumer pinned exactly, but the bump is non-breaking. Opt in with `--include-tight`. |
+| **RISKY**     | Would force a breaking change on an unwilling consumer. **Refused.**                    |
+| **DIRECT**    | A direct dependency. Upgrade `package.json`; npm rejects overriding it.                 |
+| **WITHHELD**  | Two copies of one parent need different targets; npm cannot express both.               |
+| **INHERITED** | No flaw of its own. Clears for free once its parent is fixed.                           |
 
 Risky, direct and withheld findings are never written — they need a human.
 
@@ -69,14 +69,14 @@ The audit is the arbiter, consulted whether or not the resolved version matches
 the declared text. An override can be honoured to the letter and still leave a
 package vulnerable if the advisory widened after the version was chosen.
 
-| Verdict | Meaning |
-| --- | --- |
-| `PINNED` / `RANGE` | Honoured, and the audit agrees. |
-| `AHEAD` | Resolved copy is newer than the override. Benign; drop the override. |
-| `DIVERGED` | Differs from the declared version but is absent from the audit. Benign. |
-| `STILL LISTED` | Still in the audit, but several copies exist so the audit is ambiguous. Warned. |
-| `STILL VULNERABLE` | Still in the audit and only one copy exists. **Fails.** |
-| `INERT` | Nothing in the tree for the override to act on. |
+| Verdict            | Meaning                                                                         |
+| ------------------ | ------------------------------------------------------------------------------- |
+| `PINNED` / `RANGE` | Honoured, and the audit agrees.                                                 |
+| `AHEAD`            | Resolved copy is newer than the override. Benign; drop the override.            |
+| `DIVERGED`         | Differs from the declared version but is absent from the audit. Benign.         |
+| `STILL LISTED`     | Still in the audit, but several copies exist so the audit is ambiguous. Warned. |
+| `STILL VULNERABLE` | Still in the audit and only one copy exists. **Fails.**                         |
+| `INERT`            | Nothing in the tree for the override to act on.                                 |
 
 ## Four behaviours that will otherwise cost you a day
 
@@ -96,7 +96,7 @@ npx fe-audit verify .
 **npm rejects a top-level override for a direct dependency.** Writing
 `{"axios": "1.20.1"}` while `package.json` declares `"axios": "^1.3.5"` fails
 the whole install with `EOVERRIDE`, `npm audit` included. Scoping the same
-package under a parent is allowed, so a vulnerable *nested* copy can still be
+package under a parent is allowed, so a vulnerable _nested_ copy can still be
 patched. Direct dependencies are always routed to `DIRECT`, and a backstop
 withholds any top-level placement that names one.
 
@@ -112,11 +112,11 @@ consumers that were never examined. Those are reported for review, not guessed a
 
 Measured on the same project:
 
-| Approach | Total | Critical |
-| --- | --- | --- |
-| Baseline | 83 | 10 |
-| `npm audit fix` | 60 | 9 |
-| `overrides` | 14 | 0 |
+| Approach        | Total | Critical |
+| --------------- | ----- | -------- |
+| Baseline        | 83    | 10       |
+| `npm audit fix` | 60    | 9        |
+| `overrides`     | 14    | 0        |
 
 `npm audit fix` also writes nothing to `package.json`, so its work is lost when
 the lockfile is regenerated — it went **60 → 72** in that test, while the
@@ -127,7 +127,12 @@ overrides result reproduced exactly from scratch.
 The domain is pure and dependency-free apart from `semver`:
 
 ```ts
-import { buildDependencyGraph, classifyAll, planOverrides, readFindings } from 'fe-audit';
+import {
+  buildDependencyGraph,
+  classifyAll,
+  planOverrides,
+  readFindings,
+} from "fe-audit";
 
 const graph = buildDependencyGraph(lockfile, { manifest });
 const remediations = classifyAll(readFindings(auditReport), graph, versionsFor);
