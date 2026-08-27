@@ -1,0 +1,43 @@
+{
+  "name": "fe-audit",
+  "version": "1.0.0",
+  "description": "Classify npm audit findings and generate overrides that are safe to apply",
+  "keywords": [
+    "npm",
+    "audit",
+    "overrides",
+    "vulnerabilities",
+    "security",
+    "lockfile",
+    "cli"
+  ],
+  "license": "MIT",
+  "type": "commonjs",
+  "bin": {
+    "fe-audit": "dist/cli.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "clean": "tsc --build --clean",
+    "typecheck": "tsc -p tsconfig.test.json --noEmit",
+    "test": "tsc -p tsconfig.test.json && node .tmp-test/test/fe-audit.test.js",
+    "prepublishOnly": "npm run clean && npm run build && npm test"
+  },
+  "dependencies": {
+    "semver": "^7.6.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/semver": "^7.5.8",
+    "typescript": "^5.5.4"
+  }
+}
