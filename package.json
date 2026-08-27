@@ -26,10 +26,10 @@
     "node": ">=18"
   },
   "scripts": {
-    "build": "tsc --build",
-    "clean": "tsc --build --clean",
-    "typecheck": "tsc -p tsconfig.test.json --noEmit",
-    "test": "tsc -p tsconfig.test.json && node .tmp-test/test/fe-audit.test.js",
+    "build": "tsc --build tsconfig.build.json",
+    "clean": "tsc --build tsconfig.build.json --clean",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsc -p tsconfig.json && node .tmp-test/test/fe-audit.test.js",
     "prepublishOnly": "npm run clean && npm run build && npm test"
   },
   "dependencies": {

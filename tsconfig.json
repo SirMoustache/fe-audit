@@ -4,13 +4,11 @@
     "lib": ["ES2022"],
     "module": "node16",
     "moduleResolution": "node16",
+    "types": ["node"],
 
-    "rootDir": "src",
-    "outDir": "dist",
-    "declaration": true,
-    "declarationMap": true,
+    "rootDir": ".",
+    "outDir": ".tmp-test",
     "sourceMap": true,
-    "composite": true,
 
     "strict": true,
     "noUncheckedIndexedAccess": true,
@@ -18,13 +16,11 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "noPropertyAccessFromIndexSignature": true,
-    "exactOptionalPropertyTypes": false,
 
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
-    "skipLibCheck": true,
-    "verbatimModuleSyntax": false
+    "skipLibCheck": true
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "test/**/*.ts"],
   "exclude": ["node_modules", "dist", ".tmp-test"]
 }
