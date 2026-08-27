@@ -17,6 +17,7 @@ import {
 import { assessOverrides, readDeclarations } from '../src/domain/verification';
 import { explainPackage, hasForcedBreaking } from '../src/domain/explanation';
 import { analyseUsage } from '../src/domain/usage';
+import { assessOverridesForPruning, pruneOverrides } from '../src/domain/pruning';
 import { parseJsonc, specifierToPackage } from '../src/io/source-scanner';
 import { groupRemediations } from '../src/features/remediate';
 import { assertUsableReport } from '../src/io/npm-client';
@@ -712,6 +713,101 @@ describe('usage', () => {
 
   it('reports an override with nothing left to apply to', () => {
     assert.deepStrictEqual(report.deadOverrides.map((entry) => entry.name), ['no-longer-here']);
+  });
+});
+
+describe('pruning', () => {
+  const pruneGraph = buildDependencyGraph(
+    {
+      lockfileVersion: 3,
+      packages: {
+        '': { dependencies: { app: '^1.0.0' } },
+        // Consumers agree on a safe version: the override is doing nothing.
+        'node_modules/flat-cache': { version: '3.1.1', dependencies: { flatted: '^3.2.9' } },
+        'node_modules/flatted': { version: '3.4.4' },
+        // Consumers agree on a version the override pins BELOW.
+        'node_modules/jsonwebtoken': { version: '9.0.3', dependencies: { jws: '^4.0.1' } },
+        'node_modules/jws': { version: '3.2.3' },
+        // Consumers agree on a version that is still vulnerable.
+        'node_modules/consumer': { version: '1.0.0', dependencies: { lodash: '~4.17.0' } },
+        'node_modules/lodash': { version: '4.18.1' },
+        // Consumers disagree, so npm would nest copies.
+        'node_modules/cli': { version: '1.0.0', dependencies: { tmp: '^0.1.0' } },
+        'node_modules/editor': { version: '3.1.0', dependencies: { tmp: '^0.0.33' } },
+        'node_modules/tmp': { version: '0.2.7' },
+      },
+    },
+    { manifest: {} }
+  );
+
+  const versions = new Map([
+    ['flatted', ['3.2.9', '3.4.2', '3.4.4']],
+    ['jws', ['3.2.2', '3.2.3', '4.0.0', '4.0.1']],
+    ['lodash', ['4.17.20', '4.17.21', '4.18.1']],
+    ['tmp', ['0.0.33', '0.1.0', '0.2.7']],
+  ]);
+
+  const advisories = new Map([
+    ['flatted', [{ title: 'a', severity: 'high', vulnerableRange: '<=3.4.1' }]],
+    ['jws', [{ title: 'b', severity: 'high', vulnerableRange: '<3.2.3' }]],
+    ['lodash', [{ title: 'c', severity: 'high', vulnerableRange: '<=4.17.23' }]],
+    ['tmp', [{ title: 'd', severity: 'high', vulnerableRange: '<0.2.6' }]],
+  ]);
+
+  const assess = (overrides: Parameters<typeof assessOverridesForPruning>[0]['overrides']) =>
+    assessOverridesForPruning({
+      graph: pruneGraph,
+      overrides,
+      versions,
+      advisories,
+      queried: new Set(['flatted', 'jws', 'lodash', 'tmp']),
+    });
+
+  const verdictOf = (name: string, overrides: Record<string, string>) =>
+    assess(overrides).find((entry) => entry.name === name)?.verdict;
+
+  it('keeps an override whose removal would reinstate a vulnerable version', () => {
+    // Consumers cap lodash at ~4.17.x, and every 4.17.x is still vulnerable.
+    assert.strictEqual(verdictOf('lodash', { lodash: '4.18.1' }), 'needed');
+  });
+
+  it('drops an override when consumers already agree on a safe version', () => {
+    assert.strictEqual(verdictOf('flatted', { flatted: '^3.4.2' }), 'redundant');
+  });
+
+  it('flags an override that pins below what consumers accept', () => {
+    assert.strictEqual(verdictOf('jws', { jws: '3.2.3' }), 'harmful');
+  });
+
+  it('keeps an override when consumers disagree but every option is vulnerable', () => {
+    assert.strictEqual(verdictOf('tmp', { tmp: '^0.2.4' }), 'needed');
+  });
+
+  it('reports an override with nothing to act on as inert', () => {
+    assert.strictEqual(verdictOf('gone', { gone: '1.0.0' }), 'inert');
+  });
+
+  it('never calls an override redundant when advisory data is missing', () => {
+    const withoutData = assessOverridesForPruning({
+      graph: pruneGraph,
+      overrides: { flatted: '^3.4.2' },
+      versions,
+      advisories: new Map(),
+      queried: new Set(),
+    });
+    assert.strictEqual(withoutData[0]!.verdict, 'unknown');
+  });
+
+  it('removes only the overrides it judged removable', () => {
+    const overrides = { flatted: '^3.4.2', jws: '3.2.3', lodash: '4.18.1' };
+    const remaining = pruneOverrides(overrides, assess(overrides));
+    assert.deepStrictEqual(remaining, { lodash: '4.18.1' });
+  });
+
+  it('leaves a scoped override untouched when only its sibling is removable', () => {
+    const overrides = { flatted: '^3.4.2', 'flat-cache': { flatted: '^3.4.2' } };
+    const remaining = pruneOverrides(overrides, assess(overrides));
+    assert.strictEqual('flatted' in remaining, false);
   });
 });
 

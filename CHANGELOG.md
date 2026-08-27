@@ -20,6 +20,13 @@ classification tiers — not just to exported types.
   reference; imports that were never declared; and overrides that no longer
   apply to anything. Each unreferenced dependency reports the packages, and the
   vulnerable packages, that would leave the tree with it.
+- `prune [projectDir]` — finds overrides that are no longer earning their place:
+  redundant ones npm would resolve safely anyway, *harmful* ones pinning below
+  what every consumer accepts, inert ones with nothing to apply to, and
+  ineffective ones whose forced version is itself vulnerable. Advisory ranges
+  come from npm's advisory API, because a working override removes the package
+  from `npm audit` entirely. On a real project: 45 declarations to 15, audit
+  unchanged.
 - `--skip-audit` for `explain` and `unused`, to report from the lockfile alone.
 
 ## [1.0.0] - 2026-08-27

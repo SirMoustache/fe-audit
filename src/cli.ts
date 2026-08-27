@@ -10,6 +10,8 @@ import { explainInProject } from './features/explain';
 import { renderExplanation } from './features/explain/view';
 import { analyseProjectUsage } from './features/usage';
 import { renderUsage } from './features/usage/view';
+import { prunableOverrides, applyPruning } from './features/prune';
+import { renderPruning } from './features/prune/view';
 import type { RegistryOptions } from './io/registry';
 import { isProject } from './io/workspace';
 
@@ -21,9 +23,11 @@ fe-audit - classify npm audit findings and generate safe overrides
   npx fe-audit verify <projectDir>           Check declared overrides took effect
   npx fe-audit explain <pkg> [projectDir]    Why one package is classified as it is
   npx fe-audit unused [projectDir]           Declared but unreferenced dependencies
+  npx fe-audit prune [projectDir]            Overrides that are no longer earning their place
 
 Options:
   --write               analyze: merge the proposed overrides into package.json
+                        prune: remove the overrides it finds removable
   --include-tight       analyze: also write overrides that cross an exact pin
   --omit-dev            analyze: only consider production dependencies
   --skip-audit          explain/unused: skip npm audit, use the lockfile alone
@@ -153,12 +157,22 @@ const unused = async ({ positionals, options }: Request): Promise<readonly strin
   return options.json ? asJson(result) : renderUsage(result);
 };
 
+const prune = async ({ positionals, options }: Request): Promise<readonly string[]> => {
+  const projectDir = resolveProject(positionals[0]);
+  const result = await prunableOverrides(projectDir, {
+    registryOptions: registryOptionsFrom(options),
+  });
+  if (options.write && result.removable.length > 0) applyPruning(projectDir, result.remaining);
+  return options.json ? asJson(result) : renderPruning(result, { write: options.write });
+};
+
 const COMMANDS: Readonly<Record<string, (request: Request) => Promise<readonly string[]>>> = {
   survey,
   analyze,
   verify,
   explain,
   unused,
+  prune,
 };
 
 const HELP = new Set<string | undefined>(['--help', '-h', 'help', undefined]);

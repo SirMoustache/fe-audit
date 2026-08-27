@@ -34,11 +34,12 @@ npx fe-audit analyze ./app --write    # apply the safe ones
 npx fe-audit verify ./app             # confirm they took effect
 npx fe-audit explain tmp ./app        # why one package is classified as it is
 npx fe-audit unused ./app             # declared but unreferenced dependencies
+npx fe-audit prune ./app              # overrides that no longer earn their place
 ```
 
 | Option               | Meaning                                                     |
 | -------------------- | ----------------------------------------------------------- |
-| `--write`            | Merge the proposed overrides into `package.json`            |
+| `--write`             | `analyze`: apply overrides. `prune`: remove the removable ones |
 | `--include-tight`    | Also write overrides that cross an exact pin                |
 | `--omit-dev`         | Only consider production dependencies                       |
 | `--json`             | Emit raw JSON instead of a report                           |
@@ -220,6 +221,43 @@ conventions took the candidate list from 21 to 6.
 
 Remove one at a time, with a build and test run between each.
 
+## Removing overrides that no longer help
+
+Overrides are pins, and pins go stale. Once the upstream fix lands, an override
+stops protecting anything — and can start holding a package *below* what npm
+would otherwise install.
+
+```
+$ npx fe-audit prune ./app
+
+HARMFUL - pins a lower version than npm would pick (1)
+  jws          3.2.3 vs 4.0.1    every consumer accepts 4.0.1, which is safe;
+                                 this pins the older 3.2.3
+
+REDUNDANT - npm would resolve to something safe anyway (19)
+  flatted      3.4.4             every consumer accepts 3.4.4, which is already safe
+
+KEEP - still doing real work (9)
+  lodash       4.18.1 vs 4.17.21 without it npm would resolve 4.17.21, which is vulnerable
+
+30 override(s) can be removed. Re-run with --write to apply.
+```
+
+The `jws` case is the one worth understanding: `jsonwebtoken@9` asks for
+`jws@^4.0.1`, the advisory only covers `<3.2.3`, so the override was pinning a
+*lower* major than the project would otherwise get — protecting nothing.
+
+`prune` answers a question `npm audit` cannot. Once an override works, the
+package disappears from the audit entirely, so there is no way to tell from the
+audit whether it is still needed. The advisory ranges come from npm's advisory
+API directly, for every published version of each overridden package.
+
+Measured on a real project: **45 override declarations down to 15, with the
+audit unchanged at 9 findings and nothing newly vulnerable.**
+
+An `INEFFECTIVE` override — one whose forced version is *itself* vulnerable — is
+never removed automatically. That needs a decision, not a deletion.
+
 ## Why `overrides` rather than `npm audit fix`
 
 Measured on the same project:
@@ -276,7 +314,7 @@ originally, the two copies disagreed, and the resulting bug survived until
 
 ```bash
 npm install
-npm test        # 83 assertions, no network required
+npm test        # 91 assertions, no network required
 npm run build
 node dist/cli.js analyze /path/to/project
 ```
