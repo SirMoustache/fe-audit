@@ -13,7 +13,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        node: [18, 20, 22]
+        node: [18, 20, 22, 24]
 
     steps:
       - uses: actions/checkout@v4
@@ -58,7 +58,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Must satisfy @changesets/cli's engines, same as release.yml.
+          node-version: 22
           cache: npm
 
       - run: npm ci

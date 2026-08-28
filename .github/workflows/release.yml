@@ -23,7 +23,10 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # @changesets/cli requires ^22.11 || ^24. This is the Node that runs
+          # the release tooling only - the support matrix users get is set by
+          # engines in package.json and exercised by the CI test matrix.
+          node-version: 22
           registry-url: https://registry.npmjs.org
           cache: npm
 
