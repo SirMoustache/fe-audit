@@ -338,6 +338,31 @@ describe('remediation', () => {
     assert.strictEqual(classifyFinding(finding('ws', '<8.21.0'), graph, versionsFor).length, 2);
   });
 
+  // Found against a real project. npm reports one finding per package, listing
+  // only the vulnerable paths, but every copy of the name was being classified.
+  // For a copy already above the range the escape search looks *above* it and
+  // returns the next major, which consumers reject - so a patched copy was
+  // reported as "DO NOT OVERRIDE, upgrade the parent instead".
+  it('ignores a copy already above the advisory range', () => {
+    const results = classifyFinding(finding('ws', '<8.0.0'), graph, versionsFor);
+    assert.strictEqual(results.length, 1);
+    assert.strictEqual((results[0] as OverrideRemedy).instancePath, 'node_modules/ws');
+  });
+
+  it('does not demand the next major of a copy that is already patched', () => {
+    // 7.5.13 and 8.16.0 both sit above this range, as ws did after audit fix.
+    const results = classifyFinding(finding('ws', '>=7.0.0 <7.5.11'), graph, versionsFor);
+    assert.strictEqual(results.length, 1);
+    assert.strictEqual(results[0]!.kind, 'absent');
+    assert.ok(!results.some((remedy) => remedy.kind === 'risky'));
+  });
+
+  it('still classifies a copy when the advisory range cannot be parsed', () => {
+    // Unreadable must not read as "not affected", which would drop the finding.
+    const results = classifyFinding(finding('ws', 'not-a-range'), graph, versionsFor);
+    assert.ok(results.every((remedy) => remedy.kind !== 'absent'));
+  });
+
   it('refuses a nested copy with no attributable declarer instead of overriding globally', () => {
     const orphanGraph = buildDependencyGraph({
       lockfileVersion: 3,

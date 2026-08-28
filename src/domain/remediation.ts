@@ -2,7 +2,7 @@ import type { Consumer, DependencyGraph, PackageInstance } from './dependency-gr
 import type { Finding, Severity } from './finding';
 import { hasOwnAdvisory } from './finding';
 import type { PackageName, RangeSpec, Version } from './semver-policy';
-import { accepts, findEscapeVersion, isBreakingUpgrade, isExpressible } from './semver-policy';
+import { accepts, findEscapeVersion, isBreakingUpgrade, isExpressible, testRange } from './semver-policy';
 
 /** How much trust an override deserves once it is known to be non-breaking. */
 export type Tier =
@@ -223,12 +223,32 @@ export const classifyFinding = (
     return [Object.freeze({ ...base, kind: 'absent', reason: 'not present in the lockfile' })];
   }
 
+  // npm reports one finding per package, but only some copies are inside the
+  // advisory range. Classifying a copy that is already patched asks for the
+  // next escape *above* it, which is the following major, and that gets
+  // reported as a breaking upgrade nobody needs.
+  //
+  // `null` means the range could not be read. Excluding on that would silently
+  // drop a real finding, so only a definite `false` is treated as safe.
+  const affected = instances.filter(
+    (instance) => testRange(instance.version, finding.advisoryRange) !== false
+  );
+  if (affected.length === 0) {
+    return [
+      Object.freeze({
+        ...base,
+        kind: 'absent',
+        reason: `no installed copy is within ${String(finding.advisoryRange)}`,
+      }),
+    ];
+  }
+
   const lookup = versionsFor(finding.name);
   if (!lookup.ok) {
     return [Object.freeze({ ...base, kind: 'unresolvable', reason: lookup.reason })];
   }
 
-  return instances.map((instance) => classifyInstance(finding, instance, graph, lookup.versions));
+  return affected.map((instance) => classifyInstance(finding, instance, graph, lookup.versions));
 };
 
 export const classifyAll = (
