@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import fs from 'node:fs';
 import path from 'node:path';
 import { remediateProject, applyOverrides } from './features/remediate';
 import { renderRemediation } from './features/remediate/render';
@@ -24,6 +25,9 @@ fe-audit - classify npm audit findings and generate safe overrides
   npx fe-audit explain <pkg> [projectDir]    Why one package is classified as it is
   npx fe-audit unused [projectDir]           Declared but unreferenced dependencies
   npx fe-audit prune [projectDir]            Overrides that are no longer earning their place
+
+  --help, -h                                 Show this message
+  --version, -v                              Print the installed version
 
 Options:
   --write               analyze: merge the proposed overrides into package.json
@@ -176,9 +180,25 @@ const COMMANDS: Readonly<Record<string, (request: Request) => Promise<readonly s
 };
 
 const HELP = new Set<string | undefined>(['--help', '-h', 'help', undefined]);
+const VERSION = new Set<string | undefined>(['--version', '-v', 'version']);
+
+/**
+ * Read from the manifest rather than a baked-in constant, so a release can
+ * never report a version it was not published as. `dist/cli.js` sits one
+ * directory below the package root.
+ */
+const readVersion = (): string => {
+  try {
+    const manifest = fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8');
+    return (JSON.parse(manifest) as { version?: string }).version ?? 'unknown';
+  } catch {
+    return 'unknown';
+  }
+};
 
 const main = async (argv: readonly string[]): Promise<readonly string[]> => {
   const request = parseRequest(argv);
+  if (VERSION.has(request.command)) return [readVersion()];
   if (HELP.has(request.command)) return [USAGE];
 
   const handler = COMMANDS[request.command as string];

@@ -28,14 +28,16 @@
   "types": "dist/index.d.ts",
   "files": [
     "dist",
-    "README.md"
+    "!dist/**/*.map",
+    "README.md",
+    "CHANGELOG.md"
   ],
   "engines": {
     "node": ">=18"
   },
   "scripts": {
     "build": "tsc --build tsconfig.build.json",
-    "clean": "tsc --build tsconfig.build.json --clean",
+    "clean": "node -e \"const fs=require('fs');for(const p of ['dist','.tmp-test','tsconfig.build.tsbuildinfo'])fs.rmSync(p,{recursive:true,force:true})\"",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "tsc -p tsconfig.json && node .tmp-test/test/fe-audit.test.js",
     "changeset": "changeset",
