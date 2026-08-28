@@ -41,7 +41,14 @@ jobs:
   changeset:
     # A user-visible change with no changeset silently ships undocumented, which
     # is how a changelog drifts from what actually happened.
-    if: github.event_name == 'pull_request'
+    #
+    # Skipped on the release branch: changesets/action opens that PR by deleting
+    # every changeset file, so this check would exit 1 on the one PR that must
+    # merge for a release to happen. Verified - `changeset status` with nothing
+    # pending exits 1.
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.head_ref != 'changeset-release/master'
     runs-on: ubuntu-latest
 
     steps:

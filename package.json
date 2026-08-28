@@ -35,6 +35,10 @@
   "engines": {
     "node": ">=18"
   },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
     "build": "tsc --build tsconfig.build.json",
     "clean": "node -e \"const fs=require('fs');for(const p of ['dist','.tmp-test','tsconfig.build.tsbuildinfo'])fs.rmSync(p,{recursive:true,force:true})\"",
