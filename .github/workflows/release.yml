@@ -34,6 +34,19 @@ jobs:
       - run: npm run typecheck
       - run: npm test
 
+      # A missing secret otherwise surfaces as an E403 from the registry after a
+      # successful build, which reads like an npm permissions problem. The
+      # fallback it triggers cannot work for a first release: npm only allows a
+      # trusted publisher to be configured once the package already exists.
+      - name: Require an npm token
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NPM_TOKEN" ]; then
+            echo "::error::NPM_TOKEN secret is not set. Add it under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
       # With changesets pending this opens a "Version Packages" PR. Merging that
       # PR runs this workflow again, finds no changesets, and publishes instead.
       - uses: changesets/action@v1
@@ -44,5 +57,10 @@ jobs:
           title: 'chore: version packages'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # changesets/action looks for NPM_TOKEN specifically to decide whether
+          # to authenticate with a token; without it, it falls back to OIDC.
+          # NODE_AUTH_TOKEN is what the .npmrc written by setup-node reads.
+          # Both are needed - the first chooses the path, the second authorises.
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
