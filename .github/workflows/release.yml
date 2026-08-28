@@ -23,10 +23,11 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          # @changesets/cli requires ^22.11 || ^24. This is the Node that runs
-          # the release tooling only - the support matrix users get is set by
-          # engines in package.json and exercised by the CI test matrix.
-          node-version: 22
+          # Node 24 for the npm it bundles: trusted publishing needs npm 11.5.1
+          # or newer, and Node 22 still ships npm 10.9. This is the Node that
+          # runs the release tooling only - what users get is set by engines in
+          # package.json and exercised by the CI test matrix.
+          node-version: 24
           registry-url: https://registry.npmjs.org
           cache: npm
 
@@ -34,18 +35,14 @@ jobs:
       - run: npm run typecheck
       - run: npm test
 
-      # A missing secret otherwise surfaces as an E403 from the registry after a
-      # successful build, which reads like an npm permissions problem. The
-      # fallback it triggers cannot work for a first release: npm only allows a
-      # trusted publisher to be configured once the package already exists.
-      - name: Require an npm token
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # Publishing is authorised by OIDC against the trusted publisher
+      # configured on npm, so there is no token to check. An npm too old for
+      # trusted publishing instead fails as a bare E403 from the registry,
+      # which reads like a permissions problem and says nothing about versions.
+      - name: Require an npm that supports trusted publishing
         run: |
-          if [ -z "$NPM_TOKEN" ]; then
-            echo "::error::NPM_TOKEN secret is not set. Add it under Settings > Secrets and variables > Actions."
-            exit 1
-          fi
+          npm --version
+          node -e "const s=require('semver');const v=require('child_process').execSync('npm --version').toString().trim();if(!s.gte(v,'11.5.1')){console.error('::error::npm '+v+' cannot publish via OIDC; 11.5.1 or newer is required');process.exit(1)}"
 
       # With changesets pending this opens a "Version Packages" PR. Merging that
       # PR runs this workflow again, finds no changesets, and publishes instead.
@@ -57,10 +54,6 @@ jobs:
           title: 'chore: version packages'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # changesets/action looks for NPM_TOKEN specifically to decide whether
-          # to authenticate with a token; without it, it falls back to OIDC.
-          # NODE_AUTH_TOKEN is what the .npmrc written by setup-node reads.
-          # Both are needed - the first chooses the path, the second authorises.
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # No NPM_TOKEN: its absence is what makes changesets/action take the
+          # OIDC path. Adding one back would silently switch to token auth.
           NPM_CONFIG_PROVENANCE: true
